@@ -96,7 +96,7 @@ def main():
     config = json.loads(Path(sys.argv[sys.argv.index("--") + 1]).read_text(encoding="utf-8"))
     thumb, index, target = build()
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = config["render"]["width"]
     scene.render.resolution_y = config["render"]["height"]
     scene.render.resolution_percentage = 100
