@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "poseforge"
+version = "0.1.0"
+description = "Offline Blender-based 3D pose reference generator for AI image workflows"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "beatweapon" }]
+license = { text = "MIT" }
+dependencies = [
+  "jsonschema>=4.0.0",
+]
+keywords = ["blender", "3d", "pose", "ai-art", "rendering"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+]
+
+[project.scripts]
+poseforge = "poseforge.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["poseforge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
