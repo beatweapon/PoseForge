@@ -1,0 +1,27 @@
+{
+  "model": "humanoid",
+  "pose": {
+    "action": "pinch",
+    "hand": "right",
+    "object": "card",
+    "objectPoint": "top_right_corner",
+    "fingers": [
+      "thumb",
+      "index"
+    ]
+  },
+  "cameras": [
+    "front",
+    "back",
+    "left",
+    "right",
+    "three_quarter",
+    "hand_closeup"
+  ],
+  "render": {
+    "width": 1024,
+    "height": 1024,
+    "transparent": true
+  },
+  "output": "../output"
+}
