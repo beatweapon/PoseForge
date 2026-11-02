@@ -34,3 +34,25 @@ def classify_bones(names):
             if any(word in norm for word in words):
                 result[group].append(name)
     return result
+
+
+ARM_CHAINS = {
+    side: [f"lowerarm02.{suffix}", f"lowerarm01.{suffix}",
+           f"upperarm02.{suffix}", f"upperarm01.{suffix}",
+           f"shoulder01.{suffix}", f"clavicle.{suffix}"]
+    for side, suffix in (("right", "R"), ("left", "L"))
+}
+
+def arm_chain(side, names):
+    if side not in ARM_CHAINS:
+        raise ValueError(f"Unknown hand side: {side}")
+    available = set(names)
+    missing = [n for n in ARM_CHAINS[side] if n not in available]
+    if missing:
+        raise ValueError("Incomplete MPFB arm chain: " + ", ".join(missing))
+    return list(ARM_CHAINS[side])
+
+def wrist_bone_name(side):
+    if side not in ARM_CHAINS:
+        raise ValueError(f"Unknown hand side: {side}")
+    return "wrist." + ("R" if side == "right" else "L")

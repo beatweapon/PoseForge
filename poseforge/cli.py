@@ -8,7 +8,7 @@ from .schema import load_config
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="poseforge")
-    parser.add_argument("command", choices=("validate", "render-human", "render-pinch", "render-reach",
+    parser.add_argument("command", choices=("validate", "render-human", "render-pinch", "render-reach", "render-hand-reach",
                                             "inspect-model", "setup-mpfb", "create-human"))
     parser.add_argument("config", nargs="?")
     parser.add_argument("--blender", default="blender")
@@ -44,6 +44,8 @@ def main(argv=None):
             parser.error("render-pinch requires pose.action=pinch_preview")
         if args.command == "render-reach" and config["pose"]["action"] != "reach":
             parser.error("render-reach requires pose.action=reach")
+        if args.command == "render-hand-reach" and config["pose"]["action"] != "reach_hand":
+            parser.error("render-hand-reach requires pose.action=reach_hand")
         if args.command == "render-human" and config["pose"]["action"] != "neutral":
             parser.error("render-human requires pose.action=neutral")
         if args.command == "validate":

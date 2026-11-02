@@ -21,8 +21,8 @@ def load_config(path):
         raise ValueError(f"Model file not found: {source_path}")
     data["model"]["source"] = str(source_path)
     pose = data.get("pose", {"action": "neutral"})
-    if not isinstance(pose, dict) or pose.get("action") not in ("neutral", "pinch_preview", "reach"):
-        raise ValueError("Supported actions: neutral, pinch_preview, reach")
+    if not isinstance(pose, dict) or pose.get("action") not in ("neutral", "pinch_preview", "reach", "reach_hand"):
+        raise ValueError("Supported actions: neutral, pinch_preview, reach, reach_hand")
     if pose["action"] == "pinch_preview":
         required = {"hand": "right", "object": "card"}
         if any(pose.get(k) != v for k, v in required.items()):
@@ -45,6 +45,13 @@ def load_config(path):
             if (not isinstance(pos, list) or len(pos) != 3 or
                     any(type(v) not in (float, int) or not -10 <= v <= 10 for v in pos)):
                 raise ValueError("target.position must be three finite coordinates in meters")
+    if pose["action"] == "reach_hand":
+        if pose.get("hand") not in ("left", "right"):
+            raise ValueError("reach_hand.hand must be left or right")
+        position = pose.get("target_position")
+        if (not isinstance(position, list) or len(position) != 3 or
+                any(type(v) not in (int, float) or not -10 <= v <= 10 for v in position)):
+            raise ValueError("reach_hand.target_position requires three finite numbers in meters")
     data["pose"] = pose
     cameras = data.get("cameras")
     if (not isinstance(cameras, list) or not cameras or

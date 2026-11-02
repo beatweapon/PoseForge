@@ -52,3 +52,13 @@ py -m poseforge.cli render-reach examples/human_finger_reach.json --blender "C:\
 ```
 
 生成先 `output/human_finger_reach/report.json` に `targets[].error_m`、`converged`、`actual` を出力します。AIは誤差を読んでターゲットの再配置を判断できます。**現在は指関節のみを動かす位置IKです。** 肩・肘を含む全身IK、関節限界、衝突・接触検証、カード保持は未実装です。上の例の座標も到達を保証しません。
+
+## 腕全体の到達IK（実験版）
+
+`render-hand-reach` は左右の腕のボーンを用いて、手首の関節位置を目標座標へ近づけます。
+
+```powershell
+py -m poseforge.cli render-hand-reach examples/human_hand_reach.json --blender "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
+```
+
+`output/human_hand_reach/report.json` の `targets[0].error_m` と `converged` で位置誤差を確認できます。手の向き・関節の可動域・接触や衝突は未解決で、見た目が自然である保証はありません。

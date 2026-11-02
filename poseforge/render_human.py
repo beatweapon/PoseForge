@@ -9,8 +9,8 @@ from mathutils import Vector
 
 # Blender child modules reside alongside this script, not on package sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from rig import semantic_bones
-from ik import solve_tip
+from rig import semantic_bones, arm_chain, wrist_bone_name
+from ik import solve_tip, solve_hand_reach
 
 
 def look_at(cam, point):
@@ -73,6 +73,12 @@ def main():
             result = solve_tip(rig, chain, target["position"])
             result["effector"] = target["effector"]
             reach_results.append(result)
+    elif cfg["pose"]["action"] == "reach_hand":
+        side = cfg["pose"]["hand"]
+        chain = arm_chain(side, rig.pose.bones.keys())
+        result = solve_hand_reach(rig, side, wrist_bone_name(side), chain,
+                                  cfg["pose"]["target_position"])
+        reach_results.append(result)
     mesh_objs = [o for o in bpy.data.objects
                  if o.type == "MESH" and o.name != "Card_preview_NOT_contact_solved"
                  and (o.parent == rig or any(m.type == "ARMATURE" and m.object == rig
@@ -128,8 +134,8 @@ def main():
         bpy.ops.render.render(write_still=True)
     action = cfg["pose"]["action"]
     status = ("neutral" if action == "neutral" else
-              "ik_converged" if action == "reach" and all(r["converged"] for r in reach_results)
-              else "ik_unconverged" if action == "reach" else "pose_preview_only")
+              "ik_converged" if action in ("reach", "reach_hand") and all(r["converged"] for r in reach_results)
+              else "ik_unconverged" if action in ("reach", "reach_hand") else "pose_preview_only")
     report = {"status": status, "targets": reach_results,
               "pose_action": cfg["pose"]["action"], "contact_verified": False,
               "collision_verified": False, "views": cfg["cameras"],

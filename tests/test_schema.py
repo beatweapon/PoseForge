@@ -64,6 +64,19 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.load(data)
 
+    def test_reach_hand_valid(self):
+        data = copy.deepcopy(SAMPLE)
+        data["pose"] = {"action": "reach_hand", "hand": "right",
+                        "target_position": [-0.3, -0.2, 1.05]}
+        self.assertEqual(self.load(data)["pose"]["hand"], "right")
+
+    def test_reach_hand_invalid(self):
+        data = copy.deepcopy(SAMPLE)
+        data["pose"] = {"action": "reach_hand", "hand": "left",
+                        "target_position": [True, 0, 1]}
+        with self.assertRaises(ValueError):
+            self.load(data)
+
     def test_mpfb_fingers(self):
         bones = ["finger1-1.R", "finger2-3.L", "upperleg01.R", "wrist.R"]
         groups = classify_bones(bones)
