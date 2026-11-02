@@ -16,7 +16,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.command == "setup-mpfb":
-        command = [args.blender, "--command", "extension", "install", "-s", "-e", "mpfb"]
+        command = [args.blender, "--online-mode", "--command", "extension", "install", "-s", "-e", "mpfb"]
     elif args.command == "create-human":
         if not args.config:
             parser.error("create-human requires an output .blend file path")
