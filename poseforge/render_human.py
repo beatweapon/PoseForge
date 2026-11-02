@@ -54,9 +54,19 @@ def main():
     if len(rigs) != 1:
         raise RuntimeError(f"Expected one armature, got {len(rigs)}")
     rig = rigs[0]
+    # Backwards compatibility for human.blend created before startup cleanup:
+    # remove ONLY the recognizable, unmodified Blender startup cube.
+    for obj in list(bpy.data.objects):
+        if (obj.type == "MESH" and obj.name == "Cube" and obj.parent is None
+                and len(obj.data.vertices) == 8 and not obj.modifiers
+                and all(abs(d - 2.0) < 0.001 for d in obj.dimensions)):
+            bpy.data.objects.remove(obj, do_unlink=True)
     if cfg["pose"]["action"] == "pinch_preview":
         preview_pose(rig)
-    mesh_objs = [o for o in bpy.data.objects if o.type == "MESH" and o.name != "Card_preview_NOT_contact_solved"]
+    mesh_objs = [o for o in bpy.data.objects
+                 if o.type == "MESH" and o.name != "Card_preview_NOT_contact_solved"
+                 and (o.parent == rig or any(m.type == "ARMATURE" and m.object == rig
+                                            for m in o.modifiers))]
     if not mesh_objs:
         raise RuntimeError("No body mesh in model")
     points = [o.matrix_world @ Vector(corner) for o in mesh_objs for corner in o.bound_box]
@@ -65,7 +75,13 @@ def main():
     center = (low + high) / 2
     size = max(high.z - low.z, high.x - low.x, high.y - low.y)
     wrist = rig.pose.bones.get("wrist.R")
+    # PoseBone.head is evaluated in armature space, unlike the data bone's rest head.
+    bpy.context.view_layer.update()
     close_target = rig.matrix_world @ wrist.head if wrist else center
+    if cfg["pose"]["action"] == "pinch_preview":
+        card = bpy.data.objects.get("Card_preview_NOT_contact_solved")
+        if card is not None:
+            close_target = card.matrix_world.translation
     scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = cfg["render"]["width"]
     scene.render.resolution_y = cfg["render"]["height"]
