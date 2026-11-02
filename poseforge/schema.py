@@ -21,12 +21,30 @@ def load_config(path):
         raise ValueError(f"Model file not found: {source_path}")
     data["model"]["source"] = str(source_path)
     pose = data.get("pose", {"action": "neutral"})
-    if not isinstance(pose, dict) or pose.get("action") not in ("neutral", "pinch_preview"):
-        raise ValueError("Supported actions: neutral, pinch_preview")
+    if not isinstance(pose, dict) or pose.get("action") not in ("neutral", "pinch_preview", "reach"):
+        raise ValueError("Supported actions: neutral, pinch_preview, reach")
     if pose["action"] == "pinch_preview":
         required = {"hand": "right", "object": "card"}
         if any(pose.get(k) != v for k, v in required.items()):
             raise ValueError("pinch_preview requires right hand and card")
+    if pose["action"] == "reach":
+        targets = pose.get("targets")
+        if not isinstance(targets, list) or not 1 <= len(targets) <= 10:
+            raise ValueError("reach.targets requires 1..10 targets")
+        seen = set()
+        for target in targets:
+            if not isinstance(target, dict):
+                raise ValueError("Each target must be an object")
+            name = target.get("effector")
+            valid = {f"{side}_{finger}" for side in ("left", "right")
+                     for finger in ("thumb", "index", "middle", "ring", "pinky")}
+            if name not in valid or name in seen:
+                raise ValueError("Unknown or duplicate effector")
+            seen.add(name)
+            pos = target.get("position")
+            if (not isinstance(pos, list) or len(pos) != 3 or
+                    any(type(v) not in (float, int) or not -10 <= v <= 10 for v in pos)):
+                raise ValueError("target.position must be three finite coordinates in meters")
     data["pose"] = pose
     cameras = data.get("cameras")
     if (not isinstance(cameras, list) or not cameras or
