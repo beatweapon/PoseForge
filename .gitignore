@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# PoseForge local/generated artifacts
+/output/
+/assets/
+*.blend1
+*.blend2
