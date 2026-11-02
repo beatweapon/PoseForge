@@ -24,6 +24,10 @@ def main():
     if "--" not in sys.argv:
         raise ValueError("Missing output .blend path")
     dest = Path(sys.argv[sys.argv.index("--") + 1]).resolve()
+    # The startup scene contains a 2 m Cube, camera and light. Never embed
+    # those template objects in the generated humanoid asset.
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
     svc = service()
     human = svc.create_human()
     if human is None or human.type != "MESH":
