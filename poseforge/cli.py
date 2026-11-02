@@ -9,13 +9,26 @@ from .schema import load_config
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="poseforge")
-    parser.add_argument("command", choices=("validate", "render", "inspect-model"))
-    parser.add_argument("config", help="Pose JSON, or model file for inspect-model")
+    parser.add_argument("command", choices=("validate", "render", "inspect-model", "setup-mpfb", "create-human"))
+    parser.add_argument("config", nargs="?", help="Pose JSON, model path, or .blend output for create-human")
     parser.add_argument("--blender", default="blender", help="Blender executable or path")
     parser.add_argument("--output", help="Report JSON path for inspect-model")
     args = parser.parse_args(argv)
 
-    if args.command == "inspect-model":
+    if args.command == "setup-mpfb":
+        command = [args.blender, "--command", "extension", "install", "-s", "-e", "mpfb"]
+    elif args.command == "create-human":
+        if not args.config:
+            parser.error("create-human requires an output .blend file path")
+        dest = Path(args.config).resolve()
+        if dest.suffix.lower() != ".blend":
+            parser.error("create-human output must end in .blend")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        script = Path(__file__).with_name("create_human.py")
+        command = [args.blender, "--background", "--python", str(script), "--", str(dest)]
+    elif args.command == "inspect-model":
+        if not args.config:
+            parser.error("inspect-model requires a model path")
         model = Path(args.config).resolve()
         if not model.is_file() or model.suffix.lower() not in (".blend", ".fbx", ".glb", ".gltf"):
             parser.error("inspect-model requires an existing .blend/.fbx/.glb/.gltf file")
@@ -25,6 +38,8 @@ def main(argv=None):
         command = [args.blender, "--background", "--factory-startup", "--python", str(script),
                    "--", str(model), str(report)]
     else:
+        if not args.config:
+            parser.error(f"{args.command} requires a config path")
         try:
             config = load_config(args.config)
         except (ValueError, OSError, json.JSONDecodeError) as exc:
