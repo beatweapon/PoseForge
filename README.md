@@ -42,3 +42,13 @@ py -m poseforge.cli render-pinch examples/human_card_pinch.json --blender "C:\Pr
 ## 残る課題
 
 モデルごとのIK、身体の自然なポーズ、物体保持の接触解決、メッシュの貫通判定、全身の動作プリセット。いずれも現時点で未完成です。Blender 5.2実機での新レンダリング経路の検証も未実施です。
+
+## 指先の座標目標をAIから指定する（実験版）
+
+`examples/human_finger_reach.json` は `pose.action=reach` の例です。指先の意味名（例 `right_index`）と `position: [x,y,z]` を指定し、Blenderのワールド座標（メートル）に向けてCCDで指関節を回転させます。
+
+```powershell
+py -m poseforge.cli render-reach examples/human_finger_reach.json --blender "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
+```
+
+生成先 `output/human_finger_reach/report.json` に `targets[].error_m`、`converged`、`actual` を出力します。AIは誤差を読んでターゲットの再配置を判断できます。**現在は指関節のみを動かす位置IKです。** 肩・肘を含む全身IK、関節限界、衝突・接触検証、カード保持は未実装です。上の例の座標も到達を保証しません。
