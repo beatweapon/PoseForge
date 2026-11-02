@@ -1,64 +1,44 @@
 # PoseForge
 
-オフラインで動く、AI向け3Dポーズ参考画像生成の実験ツールです。
+Blender 5.2.3 + Pythonで動く、ローカル完結型の**全身ポーズ参考資料生成ツール**です。初期ユースケースはカードをつまむ右手ですが、設計は全身Actorを対象とします。
 
-## 開発方針：全身対応を前提にした縦切り実装
+## 現在できること
 
-**最終目標は全身のポーズと小道具保持をAIが操作し、複数視点の整合した2D生成参考資料を作れること**です。手専用ツールにはしません。
+- MPFBでリグ付き全身人体を生成（`create-human`）
+- 骨階層の解析（`inspect-model`、MPFBのfinger番号を分類）
+- **実際の全身モデル**を同一シーンから6視点レンダリング（`render-human`）
+- **実験的**に右腕・指を動かしてカードを置くプレビュー（`render-pinch`）
 
-- **Actor**: 全身の骨格・体格・左右の手足・頭部を一貫した座標系で表す。最初は右腕・右手の精度を検証し、その後、同じ仕組みを左手・胴体・脚に広げる。
-- **Action**: `pinch` / `hold` / `raise_hand` など意味的な動作を、対象の骨格・関節へ適用する。アクションを特定部位や小道具にハードコードしない。
-- **Prop / Attachment**: カード、剣、本などの形状、把持点、接触面、向きを扱い、Actorと独立して管理する。
-- **Constraint / Solver**: 接触点、関節可動域、IK、干渉を解決・検証する共通基盤。手指だけの専用解法で終わらせない。
-- **Camera / Render**: 全身・部位拡大に共通するカメラ指定と同一シーンの多方向撮影。
+**重要:** `render-pinch` はまだ正しいつまみではありません。指とカードの接触点、IK、衝突・貫通判定は未実装です。今後これを検証・改良します。以前の棒人間試作は削除しました。
 
-**最初の縦切りユースケース**は「全身Actorの右手でカード右上角を親指と人差し指でつまむ」。まず実モデルの五指リグとカードの接触を成立させ、その後に全身ポーズの制御へ進みます。まだこれらの構成要素は設計目標であり、実装済みではありません。
-
-## 現在の到達点（試作0：レンダリング配線の検証）
-
-試作0（旧MVP 0.1）は **簡易的な人体・手の形状プロキシ** とカードを Blender のPythonで生成し、同じシーンを正面・背面・側面・斜め・手元拡大からレンダリングします。**実際の人体リグ・IK・衝突検出はまだありません。** 指先の設計上の接触点だけ数値検証します。写実的な人体や自然な握りを保証するものではありません。
-
-## 必要環境
-
-- Windows 11 / Python 3.10+（標準ライブラリのみ）
-- Blender 5.2.3 LTSでWindows実機レンダリング成功（PATHに `blender`、または `--blender` で実行ファイルを指定）
-
-## 実行例（PowerShell）
+## 初期セットアップ（Windows PowerShell）
 
 ```powershell
-py -m poseforge.cli validate examples/card_pinch.json
-py -m poseforge.cli render examples/card_pinch.json --blender "C:\Program Files\Blender Foundation\Blender 4.5\blender.exe"
-py -m unittest discover -s tests -v
+py -m poseforge.cli setup-mpfb --blender "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
+py -m poseforge.cli create-human assets/human.blend --blender "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
+py -m poseforge.cli inspect-model assets/human.blend --blender "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
 ```
 
-Blender が PATH にある場合、`--blender` は省略できます。出力先はJSONの `output`（設定ファイルのディレクトリを基準とする相対パス）です。既存出力は上書きされます。
+## レンダリング
 
-出力: `front.png`、`back.png`、`left.png`、`right.png`、`three_quarter.png`、`hand_closeup.png`、`report.json`。背景透過RGBA、正投影。カードの青い面を表、オレンジ面を裏として表示します。
+```powershell
+py -m unittest discover -s tests -v
+py -m poseforge.cli validate examples/human_neutral.json
+py -m poseforge.cli render-human examples/human_neutral.json --blender "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
+py -m poseforge.cli render-pinch examples/human_card_pinch.json --blender "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
+```
 
-## アーキテクチャ
+出力は `output/human_neutral` と `output/human_card_pinch`（生成物・ローカル人体モデルはGit管理対象外）。レンダリング時のインターネット接続は不要です。
 
-- `poseforge/schema.py`: オフラインJSON検証（Blender不要）
-- `poseforge/cli.py`: Blenderのバックグラウンド実行
-- `poseforge/blender_scene.py`: Blender内で簡易ジオメトリを生成し一括撮影
-- `examples/card_pinch.json`: 意味的アクションのサンプル
+## 構成
 
-## 明確な制限
+- `poseforge/rig.py`: モデル依存の骨名アダプター
+- `poseforge/schema.py`: JSON検証
+- `poseforge/cli.py`: Blenderバックグラウンド起動
+- `poseforge/render_human.py`: 全身モデルの撮影・ポーズプレビュー
+- `poseforge/model_inspect.py`: 全身骨格調査
+- `poseforge/create_human.py`: MPFBモデル生成
 
-- 人体は関節を持つ実モデルでなく、カプセル/球状の簡易プロキシです。手首・腕・指の動作の自由度は限定的です。
-- `pinch` だけを受理し、カードと二つの指の接触点は計算済みの配置です。IKは未実装。
-- 検証は点とカード表面の距離の測定であり、実際のメッシュ衝突・貫通判定ではありません。
-- Blender実機でのレンダリング検証は利用環境ごとに実施してください。ソースをGitHubへ反映したことは、実機検証の成功を意味しません。
-- 実行時に外部ネットワークAPIは呼びません。BlenderとPythonのインストールにはネット接続が必要な場合があります。
+## 残る課題
 
-## 全身モデル調査ツール
-
-外部の全身モデル（.blend / .fbx / .glb / .gltf）の骨構造を確認できます。詳細は [モデル導入ガイド](docs/model-import.md) を参照してください。これは取り込み前の調査機能であり、現時点では外部モデルによるポーズ画像生成には未対応です。
-
-## 次の段階
-
-1. 全身モデルのリグ仕様と部位名・座標系を定義。実際の五指リグ付き全身モデルを選定する。
-2. Actor / Action / Prop / Constraint / Renderの境界を実装。既存CLIとJSONを維持し、旧試作を回帰確認に残す。
-3. 最初の縦切りとしてカードpinchをIK・接触距離・貫通検証付きで実装する。
-4. 全身ポーズ（立位、腕挙上、両手保持）へ同じ仕組みを拡張する。
-
-ライセンスの明確な五指リグ付き人体モデルを導入し、IK・接触/貫通検出・数値誤差レポートを実際のモデルに適用します。MCP等のAI連携はコアCLIと切り離して追加します。
+モデルごとのIK、身体の自然なポーズ、物体保持の接触解決、メッシュの貫通判定、全身の動作プリセット。いずれも現時点で未完成です。Blender 5.2実機での新レンダリング経路の検証も未実施です。

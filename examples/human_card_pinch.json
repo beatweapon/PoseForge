@@ -1,14 +1,12 @@
 {
-  "model": "humanoid",
+  "model": {
+    "type": "mpfb",
+    "source": "../assets/human.blend"
+  },
   "pose": {
-    "action": "pinch",
+    "action": "pinch_preview",
     "hand": "right",
-    "object": "card",
-    "objectPoint": "top_right_corner",
-    "fingers": [
-      "thumb",
-      "index"
-    ]
+    "object": "card"
   },
   "cameras": [
     "front",
@@ -23,5 +21,5 @@
     "height": 1024,
     "transparent": true
   },
-  "output": "../output"
+  "output": "../output/human_card_pinch"
 }

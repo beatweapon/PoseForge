@@ -1,50 +1,61 @@
+import copy
 import json
 import tempfile
 import unittest
 from pathlib import Path
 from poseforge.schema import load_config
+from poseforge.rig import classify_bones, semantic_bones
 
-
-SAMPLE = {
-    "model": "humanoid",
-    "pose": {"action": "pinch", "hand": "right", "object": "card", "objectPoint": "top_right_corner", "fingers": ["thumb", "index"]},
-    "cameras": ["front", "back"],
-    "render": {"width": 128, "height": 128, "transparent": True},
-    "output": "output",
-}
-
+SAMPLE = {"model": {"type": "mpfb", "source": "human.blend"},
+          "pose": {"action": "neutral"}, "cameras": ["front", "back"],
+          "render": {"width": 128, "height": 128, "transparent": True},
+          "output": "output"}
 
 class ConfigTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.file = Path(self.temp.name) / "pose.json"
+        self.path = Path(self.temp.name) / "pose.json"
+        (self.path.parent / "human.blend").touch()
 
-    def load(self, value):
-        self.file.write_text(json.dumps(value), encoding="utf-8")
-        return load_config(self.file)
+    def load(self, data):
+        self.path.write_text(json.dumps(data), encoding="utf-8")
+        return load_config(self.path)
 
     def test_valid(self):
         self.assertEqual(self.load(SAMPLE)["cameras"], ["front", "back"])
 
-    def test_invalid_action(self):
-        bad = json.loads(json.dumps(SAMPLE))
-        bad["pose"]["action"] = "grab"
+    def test_missing_model(self):
+        data = copy.deepcopy(SAMPLE)
+        data["model"]["source"] = "missing.blend"
         with self.assertRaises(ValueError):
-            self.load(bad)
+            self.load(data)
 
     def test_duplicate_camera(self):
-        bad = json.loads(json.dumps(SAMPLE))
-        bad["cameras"] = ["front", "front"]
+        data = copy.deepcopy(SAMPLE)
+        data["cameras"] = ["front", "front"]
         with self.assertRaises(ValueError):
-            self.load(bad)
+            self.load(data)
 
-    def test_width_bool_rejected(self):
-        bad = json.loads(json.dumps(SAMPLE))
-        bad["render"]["width"] = True
+    def test_bad_width(self):
+        data = copy.deepcopy(SAMPLE)
+        data["render"]["width"] = True
         with self.assertRaises(ValueError):
-            self.load(bad)
+            self.load(data)
 
+    def test_unsupported_action(self):
+        data = copy.deepcopy(SAMPLE)
+        data["pose"]["action"] = "grab"
+        with self.assertRaises(ValueError):
+            self.load(data)
+
+    def test_mpfb_fingers(self):
+        bones = ["finger1-1.R", "finger2-3.L", "upperleg01.R", "wrist.R"]
+        groups = classify_bones(bones)
+        self.assertEqual(groups["thumb"], ["finger1-1.R"])
+        self.assertEqual(groups["index"], ["finger2-3.L"])
+        self.assertEqual(groups["thigh"], ["upperleg01.R"])
+        self.assertEqual(semantic_bones(bones)["right_thumb_1"], "finger1-1.R")
 
 if __name__ == "__main__":
     unittest.main()

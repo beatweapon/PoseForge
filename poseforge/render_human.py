@@ -1,0 +1,109 @@
+"""Render an existing MPFB .blend. Preview posing is NOT contact-solved."""
+import json
+import math
+import sys
+from pathlib import Path
+
+import bpy
+from mathutils import Vector
+
+# Blender child modules reside alongside this script, not on package sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from rig import semantic_bones
+
+
+def look_at(cam, point):
+    cam.rotation_euler = (Vector(point) - cam.location).to_track_quat("-Z", "Y").to_euler()
+
+
+def preview_pose(rig):
+    bones = rig.pose.bones
+    mapping = semantic_bones(bones.keys())
+    needed = ("right_upper_arm", "right_forearm", "right_wrist",
+              "right_thumb_1", "right_index_1")
+    missing = [key for key in needed if key not in mapping]
+    if missing:
+        raise RuntimeError("Missing MPFB pose bones: " + ", ".join(missing))
+    # This is a visual feasibility preview, NOT an IK solution or a correct grip.
+    angles = {"right_upper_arm": (0, 0, -0.45),
+              "right_forearm": (0.30, 0, -0.20), "right_wrist": (0.05, 0.0, 0.0),
+              "right_thumb_1": (0, 0.25, 0.15), "right_thumb_2": (0, 0.30, 0),
+              "right_index_1": (0.2, 0, 0), "right_index_2": (0.25, 0, 0)}
+    for semantic, euler in angles.items():
+        name = mapping.get(semantic)
+        if name:
+            bone = bones[name]
+            bone.rotation_mode = "XYZ"
+            bone.rotation_euler = euler
+    bpy.context.view_layer.update()
+    fingertip = rig.matrix_world @ bones[mapping["right_index_1"]].tail
+    bpy.ops.mesh.primitive_cube_add(size=1, location=fingertip + Vector((0, -0.045, -0.09)))
+    card = bpy.context.object
+    card.name = "Card_preview_NOT_contact_solved"
+    card.dimensions = (0.22, 0.007, 0.33)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+
+def main():
+    if "--" not in sys.argv:
+        raise ValueError("Missing configuration")
+    cfg = json.loads(Path(sys.argv[sys.argv.index("--") + 1]).read_text(encoding="utf-8"))
+    bpy.ops.wm.open_mainfile(filepath=cfg["model"]["source"])
+    scene = bpy.context.scene
+    rigs = [o for o in bpy.data.objects if o.type == "ARMATURE"]
+    if len(rigs) != 1:
+        raise RuntimeError(f"Expected one armature, got {len(rigs)}")
+    rig = rigs[0]
+    if cfg["pose"]["action"] == "pinch_preview":
+        preview_pose(rig)
+    mesh_objs = [o for o in bpy.data.objects if o.type == "MESH" and o.name != "Card_preview_NOT_contact_solved"]
+    if not mesh_objs:
+        raise RuntimeError("No body mesh in model")
+    points = [o.matrix_world @ Vector(corner) for o in mesh_objs for corner in o.bound_box]
+    low = Vector((min(p[i] for p in points) for i in range(3)))
+    high = Vector((max(p[i] for p in points) for i in range(3)))
+    center = (low + high) / 2
+    size = max(high.z - low.z, high.x - low.x, high.y - low.y)
+    wrist = rig.pose.bones.get("wrist.R")
+    close_target = rig.matrix_world @ wrist.head if wrist else center
+    scene.render.engine = "BLENDER_EEVEE"
+    scene.render.resolution_x = cfg["render"]["width"]
+    scene.render.resolution_y = cfg["render"]["height"]
+    scene.render.resolution_percentage = 100
+    scene.render.image_settings.file_format = "PNG"
+    scene.render.image_settings.color_mode = "RGBA"
+    scene.render.film_transparent = cfg["render"]["transparent"]
+    for obj in list(bpy.data.objects):
+        if obj.type == "CAMERA":
+            bpy.data.objects.remove(obj, do_unlink=True)
+    if not any(obj.type == "LIGHT" for obj in bpy.data.objects):
+        bpy.ops.object.light_add(type="AREA", location=center + Vector((1, -2, 3)))
+        bpy.context.object.data.energy = 650
+        bpy.context.object.data.size = 4
+    output = Path(cfg["output"])
+    output.mkdir(parents=True, exist_ok=True)
+    views = {"front": (0, -1, 0), "back": (0, 1, 0),
+             "left": (-1, 0, 0), "right": (1, 0, 0),
+             "three_quarter": (1, -1, 0.35), "hand_closeup": (0.7, -1, 0.4)}
+    for name in cfg["cameras"]:
+        direction = Vector(views[name]).normalized()
+        target = close_target if name == "hand_closeup" else center
+        distance = max(size * 2.5, 2)
+        bpy.ops.object.camera_add(location=target + direction * distance)
+        cam = bpy.context.object
+        cam.name = "PoseForge_" + name
+        cam.data.type = "ORTHO"
+        cam.data.ortho_scale = max(size * 1.18, 0.5) if name != "hand_closeup" else 0.38
+        look_at(cam, target)
+        scene.camera = cam
+        scene.render.filepath = str(output / (name + ".png"))
+        bpy.ops.render.render(write_still=True)
+    report = {"status": "neutral" if cfg["pose"]["action"] == "neutral" else "pose_preview_only",
+              "pose_action": cfg["pose"]["action"], "contact_verified": False,
+              "collision_verified": False, "views": cfg["cameras"],
+              "model": cfg["model"]["source"]}
+    (output / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()

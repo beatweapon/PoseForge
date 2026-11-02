@@ -3,28 +3,7 @@ import json
 import sys
 from pathlib import Path
 
-import bpy
-
-
-def classify_bones(bone_names):
-    """Suggest bone names by semantics, without assuming a particular rig naming scheme."""
-    labels = {"head": [], "spine": [], "upper_arm": [], "forearm": [],
-              "hand": [], "thumb": [], "index": [], "middle": [], "ring": [],
-              "pinky": [], "thigh": [], "shin": [], "foot": []}
-    aliases = {"head": ("head",), "spine": ("spine", "chest", "hips", "pelvis", "torso"),
-               "upper_arm": ("upperarm", "upper_arm", "arm_upper"),
-               "forearm": ("forearm", "lowerarm", "lower_arm"),
-               "hand": ("hand", "wrist"), "thumb": ("thumb",), "index": ("index",),
-               "middle": ("middle",), "ring": ("ring",), "pinky": ("pinky", "little"),
-               "thigh": ("thigh", "upleg", "upper_leg"),
-               "shin": ("shin", "calf", "lowerleg", "lower_leg"),
-               "foot": ("foot", "ankle")}
-    for name in bone_names:
-        normalized = name.casefold().replace(" ", "").replace("-", "_")
-        for label, tokens in aliases.items():
-            if any(t in normalized for t in tokens):
-                labels[label].append(name)
-    return labels
+import bpy\nfrom rig import classify_bones
 
 
 def main():
