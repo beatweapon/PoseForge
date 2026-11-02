@@ -10,6 +10,7 @@ from mathutils import Vector
 # Blender child modules reside alongside this script, not on package sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rig import semantic_bones
+from ik import solve_tip
 
 
 def look_at(cam, point):
@@ -61,8 +62,17 @@ def main():
                 and len(obj.data.vertices) == 8 and not obj.modifiers
                 and all(abs(d - 2.0) < 0.001 for d in obj.dimensions)):
             bpy.data.objects.remove(obj, do_unlink=True)
+    reach_results = []
     if cfg["pose"]["action"] == "pinch_preview":
         preview_pose(rig)
+    elif cfg["pose"]["action"] == "reach":
+        mapping = semantic_bones(rig.pose.bones.keys())
+        for target in cfg["pose"]["targets"]:
+            side, finger = target["effector"].split("_", 1)
+            chain = [mapping[f"{side}_{finger}_{joint}"] for joint in (3, 2, 1)]
+            result = solve_tip(rig, chain, target["position"])
+            result["effector"] = target["effector"]
+            reach_results.append(result)
     mesh_objs = [o for o in bpy.data.objects
                  if o.type == "MESH" and o.name != "Card_preview_NOT_contact_solved"
                  and (o.parent == rig or any(m.type == "ARMATURE" and m.object == rig
@@ -78,6 +88,8 @@ def main():
     # PoseBone.head is evaluated in armature space, unlike the data bone's rest head.
     bpy.context.view_layer.update()
     close_target = rig.matrix_world @ wrist.head if wrist else center
+    if reach_results:
+        close_target = Vector(reach_results[0]["actual"])
     if cfg["pose"]["action"] == "pinch_preview":
         card = bpy.data.objects.get("Card_preview_NOT_contact_solved")
         if card is not None:
@@ -114,7 +126,11 @@ def main():
         scene.camera = cam
         scene.render.filepath = str(output / (name + ".png"))
         bpy.ops.render.render(write_still=True)
-    report = {"status": "neutral" if cfg["pose"]["action"] == "neutral" else "pose_preview_only",
+    action = cfg["pose"]["action"]
+    status = ("neutral" if action == "neutral" else
+              "ik_converged" if action == "reach" and all(r["converged"] for r in reach_results)
+              else "ik_unconverged" if action == "reach" else "pose_preview_only")
+    report = {"status": status, "targets": reach_results,
               "pose_action": cfg["pose"]["action"], "contact_verified": False,
               "collision_verified": False, "views": cfg["cameras"],
               "model": cfg["model"]["source"]}
