@@ -43,7 +43,19 @@ def measure_arm_posture(rig, side):
     upper = shoulder - elbow
     lower = hand - elbow
     angle = upper.angle(lower) if upper.length > 1e-6 and lower.length > 1e-6 else 0.0
+    rotation_bones = [
+        "wrist." + suffix,
+        "finger1-1." + suffix, "finger1-2." + suffix, "finger1-3." + suffix,
+        "finger2-1." + suffix, "finger2-2." + suffix, "finger2-3." + suffix,
+    ]
+    rotations = {
+        name: round(float(__import__("math").degrees(
+            bones[name].matrix_basis.to_quaternion().angle)), 2)
+        for name in rotation_bones if name in bones
+    }
     return {
+        "local_rotation_magnitude_deg": rotations,
+        "local_rotation_is_anatomical_limit": False,
         "shoulder_world": [float(v) for v in shoulder],
         "elbow_world": [float(v) for v in elbow],
         "wrist_world": [float(v) for v in hand],
