@@ -17,6 +17,7 @@ SCENES = (
     ("human_finger_reach.json", "render-reach", "finger_reach"),
     ("human_card_pinch.json", "render-pinch", "pinch_preview"),
     ("human_card_grasp.json", "render-grasp-card", "card_grasp"),
+    ("human_card_present.json", "render-present-card", "card_present"),
 )
 PNG_HEADER = b"\x89PNG\r\n\x1a\n"
 
@@ -93,6 +94,19 @@ def main():
                 geometry_notes.append(
                     f"- {finger}: mesh vertices inside card = {count}, "
                     f"nearest sampled skin vertex to face target = {nearest} m")
+        if scene_name == "card_present" and report:
+            pose = report.get("presentation") or {}
+            posture = report.get("arm_posture") or {}
+            if pose.get("presentation") != "chest_display" or not posture:
+                problems.append("semantic placement or arm posture report missing")
+            fingers = (report.get("skin_contact_diagnostics") or {}).get("fingers", {})
+            if any(not (fingers.get(f) or {}).get("sample_count") for f in ("thumb", "index")):
+                problems.append("missing finger skin samples")
+            geometry_notes.append(
+                "- semantic presentation: elbow_below_shoulder="
+                + str(posture.get("elbow_below_shoulder"))
+                + ", elbow_angle_deg=" + str(posture.get("elbow_angle_deg"))
+                + ", bone-tip errors=" + str(errors))
         error_text = ", ".join(map(str, errors)) if errors else "—"
         if problems:
             failures.append(scene_name + ": " + "; ".join(problems))
