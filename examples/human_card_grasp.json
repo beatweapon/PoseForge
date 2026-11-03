@@ -1,0 +1,36 @@
+{
+  "model": {
+    "type": "mpfb",
+    "source": "../assets/human.blend"
+  },
+  "pose": {
+    "action": "grasp_card",
+    "hand": "right",
+    "card": {
+      "position": [
+        -0.47,
+        -0.35,
+        0.87
+      ],
+      "size": [
+        0.18,
+        0.006,
+        0.25
+      ]
+    }
+  },
+  "cameras": [
+    "front",
+    "back",
+    "left",
+    "right",
+    "three_quarter",
+    "hand_closeup"
+  ],
+  "render": {
+    "width": 1024,
+    "height": 1024,
+    "transparent": true
+  },
+  "output": "../output/human_card_grasp"
+}
