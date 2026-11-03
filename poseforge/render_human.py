@@ -179,6 +179,9 @@ def main():
                 item.get("has_penetration_evidence")
                 for item in fingers.values()) else "not_verified"
         )
+    if grasp_card is not None and skin_quality == "intersection_evidence":
+        # Do not report a 'successful grasp' solely from tip IK convergence.
+        status = "grasp_preview_intersection_evidence"
     posture = (measure_arm_posture(rig, cfg["pose"]["hand"])
                if grasp_card is not None else None)
     report = {"status": status, "skin_quality": skin_quality,
