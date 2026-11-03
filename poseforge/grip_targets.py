@@ -95,35 +95,46 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
                             @ Matrix.Translation(-pivot) @ wrist.matrix)
             bpy.context.view_layer.update()
 
-        # Small wrist roll search: correct the hand plane without rotating
-        # shoulder/elbow or pushing the hand farther from the handle.
-        # The palm-side sign is unknown, so do not infer skin-side contact.
+        # Search a bounded set of wrist roll candidates against BOTH palm
+        # plane and forward axis. Never treat an unoriented plane as proof
+        # that the palm's skin side faces the handle.
         forward_axis = current_axis()
+        wrist_trials = []
         if forward_axis is not None:
             base = wrist.matrix.copy()
-            best = base.copy()
+            pivot = wrist.head.copy()
             desired_forward = (rig.matrix_world.inverted().to_3x3() @ axis).normalized()
             def objective():
-                angles = _palm_metrics(bones, mapping, side,
+                values = _palm_metrics(bones, mapping, side,
                                        desired_forward, desired_normal)
-                if angles["plane_deg"] is None:
-                    return float("inf")
-                return angles["forward_deg"] + 0.55 * angles["plane_deg"]
-            score = objective()
-            pivot = wrist.head.copy()
-            for sign in (-1, 1):
+                if values["plane_deg"] is None:
+                    return float("inf"), values
+                return values["forward_deg"] + 0.55 * values["plane_deg"], values
+
+            best_score, values = objective()
+            best_matrix = base.copy()
+            wrist_trials.append({"roll_rad": 0.0,
+                                 "objective_deg": round(best_score, 3),
+                                 **values})
+            # Wider exploration than the original ±0.16-rad single step.
+            # Maximum total wrist roll is 0.48 rad (~27.5 degrees).
+            for rotation_angle in (-0.48, -0.32, -0.16,
+                                    0.16, 0.32, 0.48):
                 wrist.matrix = base.copy()
                 bpy.context.view_layer.update()
-                rotation = Quaternion(forward_axis, sign * 0.16)
+                rotation = Quaternion(forward_axis, rotation_angle)
                 wrist.matrix = (Matrix.Translation(pivot)
                                 @ rotation.to_matrix().to_4x4()
                                 @ Matrix.Translation(-pivot) @ wrist.matrix)
                 bpy.context.view_layer.update()
-                candidate = objective()
-                if candidate < score - 1e-5:
-                    score = candidate
-                    best = wrist.matrix.copy()
-            wrist.matrix = best
+                score, values = objective()
+                wrist_trials.append({"roll_rad": rotation_angle,
+                                     "objective_deg": round(score, 3),
+                                     **values})
+                if score < best_score - 1e-5:
+                    best_score = score
+                    best_matrix = wrist.matrix.copy()
+            wrist.matrix = best_matrix
             bpy.context.view_layer.update()
         palm_after = _palm_metrics(bones, mapping, side,
                                      (rig.matrix_world.inverted().to_3x3() @ axis).normalized(),
@@ -138,6 +149,8 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             "palm_frame_before": palm_before,
             "palm_frame_after": palm_after,
             "palm_plane_is_unoriented": True,
+            "wrist_roll_trials": wrist_trials,
+            "max_roll_from_arm_ik_rad": 0.48,
         })
 
     # Hand templates are applied AFTER arm positioning, against the shared
