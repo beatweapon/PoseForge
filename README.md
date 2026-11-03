@@ -69,3 +69,8 @@ py -m poseforge.cli render-hand-reach examples/human_hand_reach.json --blender "
 `main` への push または Actions の手動実行で `.github/workflows/blender-smoke.yml` が起動します。Linuxランナーに **Blender 5.2.3 LTS** と **MPFB** を用意し、人体生成・Python単体テスト・ニュートラル/腕IK/指IK/カードプレビューを確認します。CIはヘッドレス安定性のため `BLENDER_WORKBENCH` で512pxの3視点を描画します（通常CLIのEEVEE設定は変更しません）。
 
 各実行の Actions **Artifacts** に `poseforge-smoke-<run id>` が保存され、シーンごとのPNG、JSON、summary.md をダウンロードできます。Artifacts保持は14日です。Blenderの初期セットアップやネットワーク障害でもCIは失敗します。**スモークテストの成功は、正しいカード把持やIK収束を意味しません。** 今後の自動評価では接触距離・関節制限・貫通検出を別途追加します。
+
+
+## Two-finger card grasp preview (experimental)
+
+Run `py -m poseforge.cli render-grasp-card examples/human_card_grasp.json --blender BLENDER_PATH` to solve arm placement followed by thumb and index fingertip goals on opposite sides of the card. The `output/human_card_grasp/report.json` file includes `arm_reach` and `targets` with final world-space bone-tip errors. This is a **positional skeleton preview only**: it does not validate skin contact, anatomical joint limits, collision freedom, or whether the card can actually be held.
