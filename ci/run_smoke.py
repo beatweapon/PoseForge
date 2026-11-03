@@ -184,6 +184,8 @@ def main():
                     problems.append("missing handle-relative palm anchor fit")
                 elif not fit.get("improved_or_unchanged"):
                     problems.append("palm anchor fit got worse")
+                if fit.get("wrist_deviation_m", 999) > 0.0251:
+                    problems.append("accepted palm anchor displaced wrist over 25mm")
                 geometry_notes.append(
                     "- " + scene_name + " " + grip["hand"]
                     + " palm anchor: " + str(fit.get("initial_error_m"))
