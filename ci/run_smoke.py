@@ -16,6 +16,7 @@ SCENES = (
     ("human_hand_reach.json", "render-hand-reach", "hand_reach"),
     ("human_finger_reach.json", "render-reach", "finger_reach"),
     ("human_card_pinch.json", "render-pinch", "pinch_preview"),
+    ("human_card_grasp.json", "render-grasp-card", "card_grasp"),
 )
 PNG_HEADER = b"\x89PNG\r\n\x1a\n"
 
@@ -60,6 +61,9 @@ def main():
             except (ValueError, OSError) as exc:
                 problems.append("invalid report: " + str(exc))
         errors = [t["error_m"] for t in report.get("targets", [])] if report else []
+        if scene_name == "card_grasp" and report:
+            if len(report.get("targets", [])) != 2 or not report.get("arm_reach"):
+                problems.append("grasp diagnostics missing")
         error_text = ", ".join(map(str, errors)) if errors else "—"
         if problems:
             failures.append(scene_name + ": " + "; ".join(problems))
