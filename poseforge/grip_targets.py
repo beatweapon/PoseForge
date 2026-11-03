@@ -184,5 +184,17 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             "hand_surface_contact_verified": False,
             "orientation_verified": False,
             "finger_grip_prior": finger_priors[side],
+            "pose_quality": {
+                "status": "unverified",
+                "criteria": "palm plane <= 25deg; index tip axis gap <= 25mm",
+                "palm_plane_within_target": (
+                    palm_after["plane_deg"] is not None and
+                    palm_after["plane_deg"] <= 25.0),
+                "index_bone_axis_gap_within_target": (
+                    abs(finger_priors[side]["final_axis_distances_m"]["index"] -
+                        finger_priors[side]["radius_m"]) <= 0.025),
+                "skin_contact_verified": False,
+                "collision_free_verified": False,
+            },
         })
     return results
