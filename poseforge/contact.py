@@ -27,6 +27,7 @@ def inspect_card_skin(rig, card, side, names, body_objects):
         inside_count = 0
         methods = set()
         available_groups = []
+        topology_counts = []
         for obj in body_objects:
             groups = {obj.vertex_groups[b].index for b in bones
                       if b in obj.vertex_groups}
@@ -34,12 +35,17 @@ def inspect_card_skin(rig, card, side, names, body_objects):
             evaluated = obj.evaluated_get(depsgraph)
             mesh = evaluated.to_mesh()
             try:
-                if len(mesh.vertices) != len(obj.data.vertices):
-                    continue
+                topology_same = len(mesh.vertices) == len(obj.data.vertices)
+                topology_counts.append({"object": obj.name,
+                                        "base": len(obj.data.vertices),
+                                        "evaluated": len(mesh.vertices)})
                 matrix = evaluated.matrix_world
-                matched = [i for i, base_vert in enumerate(obj.data.vertices)
-                           if any(group.group in groups and group.weight >= 0.05
-                                  for group in base_vert.groups)]
+                # Vertex-group indices can only be mapped to evaluated vertices
+                # if modifiers have preserved topology.
+                matched = ([i for i, base_vert in enumerate(obj.data.vertices)
+                            if any(group.group in groups and group.weight >= 0.05
+                                   for group in base_vert.groups)]
+                           if topology_same else [])
                 if matched:
                     methods.add("vertex_weights")
                 else:
@@ -68,6 +74,7 @@ def inspect_card_skin(rig, card, side, names, body_objects):
             "target": [float(v) for v in goal],
             "sample_count": sample_count,
             "selection_methods": sorted(methods),
+            "mesh_topology_counts": topology_counts,
             "available_finger_groups_sample": available_groups[:12],
             "nearest_skin_vertex": best,
             "sampled_vertices_inside_card": inside_count,
