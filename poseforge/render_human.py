@@ -15,6 +15,7 @@ from ik import solve_tip, solve_hand_reach
 from grasp import solve_card_grasp, refine_skin_grasp, card_face_targets, _measure
 from contact import inspect_card_skin
 from presentation import resolve_card_presentation, measure_arm_posture
+from pose_prior import solve_card_with_prior
 
 
 def look_at(cam, point):
@@ -93,7 +94,7 @@ def main():
         bpy.context.view_layer.update()
         presented_card = resolve_card_presentation(
             rig, spec["hand"], spec["size"], spec["presentation"])
-        grasp_card, grasp_arm, reach_results = solve_card_grasp(
+        grasp_card, grasp_arm, reach_results = solve_card_with_prior(
             rig, {"hand": spec["hand"], "card": presented_card})
     mesh_objs = [o for o in bpy.data.objects
                  if o.type == "MESH" and o.name not in ("Card_preview_NOT_contact_solved", "Card_grasp_preview")
@@ -109,8 +110,9 @@ def main():
         mapping = semantic_bones(rig.pose.bones.keys())
         targets = card_face_targets(
             card_spec["position"], card_spec["size"])
-        grasp_skin_search = refine_skin_grasp(
-            rig, grasp_card, side, mesh_objs, targets)
+        if presented_card is None:
+            grasp_skin_search = refine_skin_grasp(
+                rig, grasp_card, side, mesh_objs, targets)
         reach_results = _measure(rig, rig.pose.bones, mapping, side, targets)
         for row in reach_results:
             row["sample_point"] = "bone_tail"
