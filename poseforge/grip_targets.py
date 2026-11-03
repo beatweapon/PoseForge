@@ -9,7 +9,7 @@ from mathutils import Matrix, Quaternion, Vector
 from ik import solve_hand_reach
 from rig import arm_chain, wrist_bone_name, semantic_bones
 from grip_pose import apply_cylinder_grip
-from palm_anchor import resolve_palm_target, fit_palm_anchor
+from palm_anchor import resolve_palm_target, fit_palm_anchor, palm_anchor
 
 
 def _hand_frame(bones, names, side):
@@ -179,7 +179,18 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             fit["rejection_reason"] = "wrist_original_goal_deviation_over_25mm"
         else:
             fit["accepted"] = True
-        fit["wrist_deviation_m"] = round(float(wrist_deviation), 6)
+        fit["candidate_wrist_deviation_m"] = round(float(wrist_deviation), 6)
+        # Diagnostics must describe the accepted/restored scene, not a
+        # discarded trial whose skeleton no longer exists.
+        accepted_palm = palm_anchor(rig, side)
+        accepted_gap = (accepted_palm - goal).length
+        accepted_wrist = rig.matrix_world @ wrist.head
+        fit["final_error_m"] = round(float(accepted_gap), 6)
+        fit["actual_world"] = [float(v) for v in accepted_palm]
+        fit["wrist_deviation_m"] = round(
+            float((accepted_wrist - original_goal).length), 6)
+        fit["improved_or_unchanged"] = (
+            accepted_gap <= fit["initial_error_m"] + 1e-5)
         palm_fits[side] = fit
 
     # Hand templates are applied AFTER arm positioning, against the shared
