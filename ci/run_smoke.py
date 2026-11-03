@@ -99,6 +99,12 @@ def main():
             posture = report.get("arm_posture") or {}
             if pose.get("presentation") != "chest_display" or not posture:
                 problems.append("semantic placement or arm posture report missing")
+            prior = (report.get("arm_reach") or {}).get("pose_prior", {})
+            if prior.get("name") != "pinch_v1":
+                problems.append("missing pinch pose prior report")
+            geometry_notes.append(
+                "- pose prior: " + str(prior.get("chosen"))
+                + ", tip errors=" + str(prior.get("final_errors_m")))
             fingers = (report.get("skin_contact_diagnostics") or {}).get("fingers", {})
             if any(not (fingers.get(f) or {}).get("sample_count") for f in ("thumb", "index")):
                 problems.append("missing finger skin samples")
