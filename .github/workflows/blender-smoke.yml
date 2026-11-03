@@ -1,0 +1,90 @@
+name: Blender smoke tests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: poseforge-blender-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  blender-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      BLENDER_VERSION: "5.2.3"
+      BLENDER_BINARY: "${{ github.workspace }}/.tools/blender-5.2.3-linux-x64/blender"
+      POSEFORGE_RENDER_ENGINE: BLENDER_WORKBENCH
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      DISPLAY: ":99"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Prepare Linux headless graphics
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgl1 libxrender1 libxi6 libxxf86vm1 libxfixes3 libsm6
+          Xvfb :99 -screen 0 1280x1024x24 -ac > /tmp/poseforge-xvfb.log 2>&1 &
+          echo $! > /tmp/poseforge-xvfb.pid
+
+      - name: Cache official Blender archive
+        uses: actions/cache@v4
+        with:
+          path: .tools/blender-5.2.3-linux-x64.tar.xz
+          key: blender-linux-x64-5.2.3
+
+      - name: Download Blender 5.2.3 when cache is empty
+        shell: bash
+        run: |
+          mkdir -p .tools
+          if [ ! -s ".tools/blender-5.2.3-linux-x64.tar.xz" ]; then
+            curl -fL --retry 3 --retry-delay 5 \
+              "https://download.blender.org/release/Blender5.2/blender-5.2.3-linux-x64.tar.xz" \
+              -o ".tools/blender-5.2.3-linux-x64.tar.xz"
+          fi
+          tar -xJf ".tools/blender-5.2.3-linux-x64.tar.xz" -C .tools
+          "$BLENDER_BINARY" --background --factory-startup --python-expr "import bpy; print('CI Blender:', bpy.app.version_string)"
+
+      - name: Install MPFB extension (network access only for setup)
+        run: python -m poseforge.cli setup-mpfb --blender "$BLENDER_BINARY"
+
+      - name: Generate rigged human asset
+        run: python -m poseforge.cli create-human assets/human.blend --blender "$BLENDER_BINARY"
+
+      - name: Render and validate smoke-test scenes
+        run: python ci/run_smoke.py --blender "$BLENDER_BINARY"
+
+      - name: Add summary to workflow
+        if: always()
+        shell: bash
+        run: |
+          if [ -f output/ci/summary.md ]; then
+            cat output/ci/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Smoke test did not produce a summary. Check job logs." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload rendered PNGs and JSON reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poseforge-smoke-${{ github.run_id }}
+          path: |
+            output/ci/
+            assets/human.json
+          if-no-files-found: warn
+          retention-days: 14

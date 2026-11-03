@@ -1,6 +1,7 @@
 """Render an existing MPFB .blend. Preview posing is NOT contact-solved."""
 import json
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -100,7 +101,7 @@ def main():
         card = bpy.data.objects.get("Card_preview_NOT_contact_solved")
         if card is not None:
             close_target = card.matrix_world.translation
-    scene.render.engine = "BLENDER_EEVEE"
+    scene.render.engine = os.environ.get("POSEFORGE_RENDER_ENGINE", "BLENDER_EEVEE")
     scene.render.resolution_x = cfg["render"]["width"]
     scene.render.resolution_y = cfg["render"]["height"]
     scene.render.resolution_percentage = 100

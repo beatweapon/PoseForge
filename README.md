@@ -62,3 +62,10 @@ py -m poseforge.cli render-hand-reach examples/human_hand_reach.json --blender "
 ```
 
 `output/human_hand_reach/report.json` の `targets[0].error_m` と `converged` で位置誤差を確認できます。手の向き・関節の可動域・接触や衝突は未解決で、見た目が自然である保証はありません。
+
+
+## GitHub Actions 自動検証
+
+`main` への push または Actions の手動実行で `.github/workflows/blender-smoke.yml` が起動します。Linuxランナーに **Blender 5.2.3 LTS** と **MPFB** を用意し、人体生成・Python単体テスト・ニュートラル/腕IK/指IK/カードプレビューを確認します。CIはヘッドレス安定性のため `BLENDER_WORKBENCH` で512pxの3視点を描画します（通常CLIのEEVEE設定は変更しません）。
+
+各実行の Actions **Artifacts** に `poseforge-smoke-<run id>` が保存され、シーンごとのPNG、JSON、summary.md をダウンロードできます。Artifacts保持は14日です。Blenderの初期セットアップやネットワーク障害でもCIは失敗します。**スモークテストの成功は、正しいカード把持やIK収束を意味しません。** 今後の自動評価では接触距離・関節制限・貫通検出を別途追加します。
