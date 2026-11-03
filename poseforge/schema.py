@@ -21,8 +21,8 @@ def load_config(path):
         raise ValueError(f"Model file not found: {source_path}")
     data["model"]["source"] = str(source_path)
     pose = data.get("pose", {"action": "neutral"})
-    if not isinstance(pose, dict) or pose.get("action") not in ("neutral", "pinch_preview", "reach", "reach_hand", "grasp_card", "present_card", "hold_bow"):
-        raise ValueError("Supported actions: neutral, pinch_preview, reach, reach_hand, grasp_card, present_card, hold_bow")
+    if not isinstance(pose, dict) or pose.get("action") not in ("neutral", "pinch_preview", "reach", "reach_hand", "grasp_card", "present_card", "hold_bow", "hold_staff"):
+        raise ValueError("Supported actions: neutral, pinch_preview, reach, reach_hand, grasp_card, present_card, hold_bow, hold_staff")
     if pose["action"] == "pinch_preview":
         required = {"hand": "right", "object": "card"}
         if any(pose.get(k) != v for k, v in required.items()):
@@ -76,12 +76,12 @@ def load_config(path):
                 any(type(v) not in (int, float) or not 0.001 <= v <= 1.0
                     for v in size)):
             raise ValueError("present_card.size must have three positive dimensions")
-    if pose["action"] == "hold_bow":
+    if pose["action"] in ("hold_bow", "hold_staff"):
         if pose.get("presentation") != "across_waist":
-            raise ValueError("hold_bow.presentation must be across_waist")
+            raise ValueError("prop presentation must be across_waist")
         length = pose.get("length_m")
         if type(length) not in (int, float) or not 0.8 <= length <= 2.0:
-            raise ValueError("hold_bow.length_m must be 0.8..2.0 meters")
+            raise ValueError("prop length_m must be 0.8..2.0 meters")
     data["pose"] = pose
     cameras = data.get("cameras")
     if (not isinstance(cameras, list) or not cameras or
