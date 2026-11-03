@@ -139,7 +139,7 @@ def main():
     if grasp_card is not None:
         close_target = grasp_card.matrix_world.translation
     if bow_prop is not None:
-        close_target = Vector(bow_prop["center"])
+        close_target = Vector(bow_prop["grips"]["right"])
     if cfg["pose"]["action"] == "pinch_preview":
         card = bpy.data.objects.get("Card_preview_NOT_contact_solved")
         if card is not None:
