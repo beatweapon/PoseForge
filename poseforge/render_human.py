@@ -152,7 +152,16 @@ def main():
               else "ik_unconverged" if action in ("reach", "reach_hand") else "pose_preview_only")
     if action == "grasp_card":
         status = "grasp_preview_within_tolerance" if all(r["converged"] for r in reach_results) else "grasp_preview_unconverged"
-    report = {"status": status, "targets": reach_results,
+    skin_quality = None
+    if skin_contact is not None:
+        fingers = skin_contact.get("fingers", {})
+        skin_quality = (
+            "intersection_evidence" if any(
+                item.get("has_penetration_evidence")
+                for item in fingers.values()) else "not_verified"
+        )
+    report = {"status": status, "skin_quality": skin_quality,
+              "targets": reach_results,
               "arm_reach": grasp_arm, "card": cfg["pose"].get("card"),
               "skin_contact_diagnostics": skin_contact,
               "pose_action": cfg["pose"]["action"], "contact_verified": False,
