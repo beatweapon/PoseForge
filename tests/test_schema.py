@@ -120,6 +120,19 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.load(data)
 
+    def test_hold_staff_valid(self):
+        data = copy.deepcopy(SAMPLE)
+        data["pose"] = {"action": "hold_staff", "presentation": "across_waist",
+                        "length_m": 1.3}
+        self.assertEqual(self.load(data)["pose"]["action"], "hold_staff")
+
+    def test_hold_staff_rejects_invalid_length(self):
+        data = copy.deepcopy(SAMPLE)
+        data["pose"] = {"action": "hold_staff", "presentation": "across_waist",
+                        "length_m": True}
+        with self.assertRaises(ValueError):
+            self.load(data)
+
     def test_mpfb_skin_groups(self):
         self.assertIn("joint-r-finger-1-3", mpfb_skin_groups("right", "thumb"))
         self.assertIn("joint-l-finger-2-4", mpfb_skin_groups("left", "index"))
