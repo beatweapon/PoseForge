@@ -168,6 +168,17 @@ def main():
                     + " palm-plane angle "
                     + str(before.get("plane_deg")) + " -> "
                     + str(after.get("plane_deg")) + " deg")
+                qa = grip.get("pose_quality") or {}
+                if qa.get("status") != "unverified":
+                    problems.append("missing explicit grasp verification status")
+                geometry_notes.append(
+                    "- " + scene_name + " " + grip["hand"]
+                    + " grip QA: palm-plane within target="
+                    + str(qa.get("palm_plane_within_target"))
+                    + "; bone-axis gap within target="
+                    + str(qa.get("index_bone_axis_gap_within_target"))
+                    + "; skin contact verified="
+                    + str(qa.get("skin_contact_verified")))
                 prior = grip.get("finger_grip_prior") or {}
                 if prior.get("name") != "cylinder_finger_prior_v1":
                     problems.append("missing cylinder finger prior")
