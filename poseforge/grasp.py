@@ -3,7 +3,7 @@
 This tests bone-tip proximity, NOT skin contact or collision-free grasping.
 """
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Quaternion, Vector
 from rig import arm_chain, wrist_bone_name, semantic_bones
 from ik import solve_hand_reach, solve_tip
 
@@ -78,7 +78,7 @@ def solve_card_grasp(rig, spec):
     results = fit_fingers()
     initial_max_error = max(r["error_m"] for r in results)
     best_score = sum(r["error_m"] ** 2 for r in results)
-    optimized_bones = list(dict.fromkeys(arm_names + sum(finger_chains.values(), [])))
+    optimized_bones = list(dict.fromkeys(arm_names + [wrist] + sum(finger_chains.values(), [])))
     best_pose = {name: bones[name].matrix.copy() for name in optimized_bones}
     history = [{"pass": 0, "max_error_m": initial_max_error,
                 "sum_square_error": best_score}]
@@ -112,6 +112,34 @@ def solve_card_grasp(rig, spec):
             # No systematic progress: don't keep accumulating distorted poses.
             break
 
+    # The wrist orientation controls the separation and reach of thumb/index.
+    # Explore a small bounded set of wrist rotations instead of only trying
+    # translations. Record errors; these are still bone-tip proxy targets.
+    def restore_pose(snapshot):
+        for name in sorted(optimized_bones,
+                           key=lambda n: len(bones[n].parent_recursive)):
+            bones[name].matrix = snapshot[name]
+            bpy.context.view_layer.update()
+
+    orientation_trials = []
+    for axis in ((1, 0, 0), (0, 1, 0), (0, 0, 1)):
+        for angle in (-0.35, 0.35):
+            restore_pose(best_pose)
+            pivot = bones[wrist].head.copy()
+            rotation = Quaternion(Vector(axis), angle).to_matrix().to_4x4()
+            bones[wrist].matrix = (Matrix.Translation(pivot) @ rotation
+                                   @ Matrix.Translation(-pivot) @ bones[wrist].matrix)
+            bpy.context.view_layer.update()
+            candidate = fit_fingers()
+            score = sum(row["error_m"] ** 2 for row in candidate)
+            orientation_trials.append({"axis": list(axis), "angle_rad": angle,
+                                       "max_error_m": max(row["error_m"] for row in candidate),
+                                       "sum_square_error": score})
+            if score + 1e-10 < best_score:
+                best_score = score
+                best_pose = {name: bones[name].matrix.copy()
+                             for name in optimized_bones}
+
     # Restore poses in hierarchy order (parents before children) so child
     # matrices are not shifted by later parent restoration.
     for name in sorted(optimized_bones, key=lambda n: len(bones[n].parent_recursive)):
@@ -124,6 +152,7 @@ def solve_card_grasp(rig, spec):
         "passes": history,
         "initial_max_error_m": initial_max_error,
         "final_max_error_m": max(row["error_m"] for row in final_results),
-        "strategy": "wrist residual refinement with best-pose rollback",
+        "strategy": "wrist residual refinement plus orientation sweep",
+        "orientation_trials": orientation_trials,
     }
     return card, arm, final_results
