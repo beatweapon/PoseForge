@@ -101,3 +101,10 @@ Specify `pose.action="present_card"`, `hand="right"`, `presentation="chest_displ
 The semantic `present_card` action uses `poseforge/pose_prior.py` to apply a conservative local joint-angle hand template before arm IK. It then allows at most three limited CCD correction iterations (0.04 radian per joint step) on thumb/index. This avoids prioritizing a tiny bone-tip error over the hand's shape. The older `grasp_card` is deliberately unchanged as a numerical baseline.
 
 `report.json > arm_reach.pose_prior` includes the template's joint angles, initial/final errors and whether the prior or bounded correction was selected. The pose-prior angles are only **experimental guesses** in MPFB local axes, not calibrated anatomy or verified joint limits; the rendered views must be inspected before treating them as a natural pinch.
+
+
+## Generic prop grip frames (experimental)
+
+`poseforge/grip_targets.py` accepts a set of world-space grip frames with `hand` (`left` / `right`), `grip_world`, `wrist_offset`, and `approach_axis_world`. It applies position IK to each wrist, then a **bounded** wrist rotation (at most 0.20 radians) toward the chosen hand axis, and remeasures both wrists. The result reports wrist-position error and the angle between the measured wrist-to-index-knuckle vector and the requested approach axis.
+
+Two different objects now share this solver: `render-hold-bow` and `render-hold-staff` (see `examples/human_staff_hold.json`). Both produce six views from one unchanged 3D scene, with one rigid prop. These grip frames are internal Blender-facing data; direct arbitrary-prop JSON authoring is a future milestone. Neither contact, finger wrapping, collision avoidance, nor anatomically valid wrist orientation is verified by this first pass.
