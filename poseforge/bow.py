@@ -5,8 +5,7 @@ move. Wrist IK is a coarse proxy, not a physically verified grip.
 """
 import bpy
 from mathutils import Vector
-from ik import solve_hand_reach
-from rig import arm_chain, wrist_bone_name
+from grip_targets import solve_grip_frames
 
 
 def _tube(name, points, radius, color):
@@ -67,25 +66,13 @@ def hold_bow(rig, specification):
     length = float(specification["length_m"])
     c = shoulder_mid + Vector((0, -0.28, -0.41))
     prop = create_bow(c, length)
-    results = []
-    for side in ("right", "left"):
-        grip = Vector(prop["grips"][side])
-        # The wrist joint is intentionally just below and behind the bow;
-        # it is not identical to palm or skin contact.
-        goal = grip + Vector((0, 0.012, 0.078))
-        wrist = wrist_bone_name(side)
-        res = solve_hand_reach(
-            rig, side, wrist, arm_chain(side, bones.keys()), goal)
-        bpy.context.view_layer.update()
-        results.append({"hand": side, "grip_world": prop["grips"][side],
-                        "wrist_goal_world": [float(v) for v in goal],
-                        **res})
-    # Re-measure BOTH after solving BOTH; avoid stale first-hand reports.
-    for item in results:
-        side = item["hand"]
-        actual = rig.matrix_world @ bones[wrist_bone_name(side)].head
-        goal = Vector(item["wrist_goal_world"])
-        item["actual"] = [float(v) for v in actual]
-        item["error_m"] = round(float((actual - goal).length), 6)
-        item["converged"] = item["error_m"] <= 0.01
+    grip_frames = [
+        {"hand": side, "grip_world": prop["grips"][side],
+         "wrist_offset": [0, 0.012, 0.078],
+         "approach_axis_world": [0, 0, -1]}
+        for side in ("right", "left")
+    ]
+    results = solve_grip_frames(rig, grip_frames)
+    prop["kind"] = "bow"
+    prop["grip_frames"] = grip_frames
     return prop, results
