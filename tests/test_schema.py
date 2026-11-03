@@ -92,6 +92,21 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.load(data)
 
+    def test_present_card_valid(self):
+        data = copy.deepcopy(SAMPLE)
+        data["pose"] = {"action": "present_card", "hand": "right",
+                        "presentation": "chest_display",
+                        "size": [0.18, 0.006, 0.25]}
+        self.assertEqual(self.load(data)["pose"]["presentation"], "chest_display")
+
+    def test_present_card_invalid_size(self):
+        data = copy.deepcopy(SAMPLE)
+        data["pose"] = {"action": "present_card", "hand": "right",
+                        "presentation": "chest_display",
+                        "size": [True, 0.006, 0.25]}
+        with self.assertRaises(ValueError):
+            self.load(data)
+
     def test_mpfb_skin_groups(self):
         self.assertIn("joint-r-finger-1-3", mpfb_skin_groups("right", "thumb"))
         self.assertIn("joint-l-finger-2-4", mpfb_skin_groups("left", "index"))
