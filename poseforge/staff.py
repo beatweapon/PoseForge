@@ -23,7 +23,8 @@ def hold_staff(rig, specification):
     frames = [
         {"hand": side, "grip_world": list(pos),
          "wrist_offset": [0, 0.012, 0.078],
-         "approach_axis_world": [0, 0, -1]}
+         "approach_axis_world": [0, 0, -1],
+         "handle_axis_world": [1, 0, 0], "handle_radius_m": 0.016}
         for side, pos in positions.items()
     ]
     results = solve_grip_frames(rig, frames)
