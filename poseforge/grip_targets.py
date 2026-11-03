@@ -9,6 +9,7 @@ from mathutils import Matrix, Quaternion, Vector
 from ik import solve_hand_reach
 from rig import arm_chain, wrist_bone_name, semantic_bones
 from grip_pose import apply_cylinder_grip
+from palm_anchor import resolve_palm_target, fit_palm_anchor
 
 
 def _hand_frame(bones, names, side):
@@ -153,6 +154,34 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             "max_roll_from_arm_ik_rad": 0.48,
         })
 
+    # Re-solve from a handle-relative palm target, rather than tuning a fixed
+    # wrist offset. Preserve the earlier wrist pose when its original wrist
+    # target would be lost by more than 70mm.
+    palm_fits = {}
+    for item in targets:
+        side = item["hand"]
+        wrist = bones[wrist_bone_name(side)]
+        chain = arm_chain(side, bones.keys())
+        saved = {name: bones[name].matrix.copy() for name in chain}
+        goal = resolve_palm_target(
+            item["grip_world"], item.get("handle_axis_world", (1, 0, 0)),
+            item["approach_axis_world"], item.get("handle_radius_m", 0.016))
+        fit = fit_palm_anchor(rig, side, goal)
+        actual_wrist = rig.matrix_world @ wrist.head
+        original_goal = Vector(item["grip_world"]) + Vector(item["wrist_offset"])
+        wrist_deviation = (actual_wrist - original_goal).length
+        if wrist_deviation > 0.07:
+            for name in sorted(chain,
+                               key=lambda n: len(bones[n].parent_recursive)):
+                bones[name].matrix = saved[name]
+                bpy.context.view_layer.update()
+            fit["accepted"] = False
+            fit["rejection_reason"] = "wrist_original_goal_deviation_over_70mm"
+        else:
+            fit["accepted"] = True
+        fit["wrist_deviation_m"] = round(float(wrist_deviation), 6)
+        palm_fits[side] = fit
+
     # Hand templates are applied AFTER arm positioning, against the shared
     # rigid handle frame. They do not move the prop or rewrite arm targets.
     finger_priors = {}
@@ -184,6 +213,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             "hand_surface_contact_verified": False,
             "orientation_verified": False,
             "finger_grip_prior": finger_priors[side],
+            "palm_anchor_fit": palm_fits[side],
             "pose_quality": {
                 "status": "unverified",
                 "criteria": "palm plane <= 25deg; index tip axis gap <= 25mm",
