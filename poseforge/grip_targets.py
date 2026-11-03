@@ -72,7 +72,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
 
         before_axis = current_axis()
         desired_normal_world = Vector(item.get("palm_normal_world",
-                                              (0, 0, -1)))
+                                              (0, -1, 0)))
         if desired_normal_world.length < 1e-6:
             raise ValueError("Zero palm plane normal")
         desired_normal = (rig.matrix_world.inverted().to_3x3()
