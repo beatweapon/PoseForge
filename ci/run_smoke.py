@@ -19,6 +19,7 @@ SCENES = (
     ("human_card_grasp.json", "render-grasp-card", "card_grasp"),
     ("human_card_present.json", "render-present-card", "card_present"),
     ("human_bow_hold.json", "render-hold-bow", "bow_hold"),
+    ("human_staff_hold.json", "render-hold-staff", "staff_hold"),
 )
 PNG_HEADER = b"\x89PNG\r\n\x1a\n"
 
@@ -38,7 +39,7 @@ def main():
         config["model"]["source"] = str((ROOT / "assets" / "human.blend").resolve())
         config["output"] = str(OUT / scene_name)
         config["cameras"] = (["front", "back", "left", "right", "three_quarter", "hand_closeup"]
-                             if scene_name == "bow_hold"
+                             if scene_name in ("bow_hold", "staff_hold")
                              else ["front", "three_quarter", "hand_closeup"])
         config["render"].update(width=512, height=512)
         config_file = OUT / (scene_name + ".json")
@@ -138,6 +139,19 @@ def main():
             geometry_notes.append(
                 "- bow hold: wrist-to-target errors=" + str(errors)
                 + "; rigid bow length=" + str(prop.get("length_m")))
+        if scene_name in ("bow_hold", "staff_hold") and report:
+            wrists = report.get("targets", [])
+            if len(wrists) != 2:
+                problems.append("two wrist grips required")
+            for grip in wrists:
+                if grip.get("orientation_angle_after_deg") is None:
+                    problems.append("missing hand direction metric")
+                if grip.get("orientation_step_limit_rad") != 0.20:
+                    problems.append("wrong wrist orientation bound")
+            if scene_name == "staff_hold":
+                prop = report.get("bow_prop") or {}
+                if prop.get("kind") != "staff" or not prop.get("shared_scene"):
+                    problems.append("missing shared-scene staff geometry")
         error_text = ", ".join(map(str, errors)) if errors else "—"
         if problems:
             failures.append(scene_name + ": " + "; ".join(problems))
