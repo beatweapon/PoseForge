@@ -166,7 +166,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
         goal = resolve_palm_target(
             item["grip_world"], item.get("handle_axis_world", (1, 0, 0)),
             item["approach_axis_world"], item.get("handle_radius_m", 0.016))
-        fit = fit_palm_anchor(rig, side, goal)
+        fit = fit_palm_anchor(rig, side, goal, wrist_goal_world=original_goal)
         actual_wrist = rig.matrix_world @ wrist.head
         original_goal = Vector(item["grip_world"]) + Vector(item["wrist_offset"])
         wrist_deviation = (actual_wrist - original_goal).length
