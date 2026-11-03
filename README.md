@@ -81,3 +81,16 @@ Run `py -m poseforge.cli render-grasp-card examples/human_card_grasp.json --blen
 指先の骨先端がカード目標点から3mm以内でも、見た目が自然にカードを保持しているとは限りません。実際にその問題が確認されたため、`grasp_card` のCIでは **骨先端の位置誤差（5mm超を回帰失敗とする）** に加え、MPFBの変形済みメッシュから指のウェイトに属する頂点を抽出し、カードの表面目標への距離とカード内に入ったサンプル頂点数を `skin_contact_diagnostics` に出力します。
 
 この頂点サンプリングは簡易診断であり、**接触面の完全な衝突判定ではありません**。指の自然な曲がり、指腹接触、手の向き、関節限界を今後の設計課題とします。数字だけを最適化せず、CIの複数視点画像を確認して進めます。
+
+
+## Semantic card presentation (experimental)
+
+`render-present-card` accepts actor-relative placement, rather than guessing absolute world-space XYZ coordinates. See `examples/human_card_present.json`.
+
+```powershell
+py -m poseforge.cli render-present-card examples/human_card_present.json --blender "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
+```
+
+Specify `pose.action="present_card"`, `hand="right"`, `presentation="chest_display"`, and the card `size` in meters. The card is placed using the rig's measured shoulder location and a fixed chest-forward offset. The old `grasp_card` action remains available as a comparison control.
+
+`report.json` now contains `presentation` and `arm_posture` (elbow height and rough elbow angle) alongside finger-tip and skin-sampling metrics. This is an **experimental placement preset**, not an anatomical posture solver: there is no joint-angle constraint or full mesh collision validation. A CI pass means the pipeline executed, not that the character holds the card convincingly.
