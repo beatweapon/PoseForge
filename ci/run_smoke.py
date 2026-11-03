@@ -179,6 +179,16 @@ def main():
                     + str(qa.get("index_bone_axis_gap_within_target"))
                     + "; skin contact verified="
                     + str(qa.get("skin_contact_verified")))
+                fit = grip.get("palm_anchor_fit") or {}
+                if fit.get("name") != "skeletal_palm_anchor_v1":
+                    problems.append("missing handle-relative palm anchor fit")
+                elif not fit.get("improved_or_unchanged"):
+                    problems.append("palm anchor fit got worse")
+                geometry_notes.append(
+                    "- " + scene_name + " " + grip["hand"]
+                    + " palm anchor: " + str(fit.get("initial_error_m"))
+                    + " -> " + str(fit.get("final_error_m"))
+                    + "m, accepted=" + str(fit.get("accepted")))
                 prior = grip.get("finger_grip_prior") or {}
                 if prior.get("name") != "cylinder_finger_prior_v1":
                     problems.append("missing cylinder finger prior")
