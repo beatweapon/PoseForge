@@ -14,7 +14,7 @@ def inspect_card_skin(rig, card, side, names, body_objects):
     size = card.dimensions.copy()
     targets = card_face_targets(center, size)
     depsgraph = __import__("bpy").context.evaluated_depsgraph_get()
-    report = {"method": "weighted_evaluated_mesh_vertices",
+    report = {"method": "weighted_vertices_with_tip_proximity_fallback",
               "is_exact_collision_test": False, "fingers": {}}
 
     for finger in ("thumb", "index"):
@@ -23,21 +23,33 @@ def inspect_card_skin(rig, card, side, names, body_objects):
         best = None
         sample_count = 0
         inside_count = 0
+        methods = set()
+        available_groups = []
         for obj in body_objects:
             groups = {obj.vertex_groups[b].index for b in bones
                       if b in obj.vertex_groups}
-            if not groups:
-                continue
+            available_groups.extend([g.name for g in obj.vertex_groups if "finger" in g.name.lower()][:12])
             evaluated = obj.evaluated_get(depsgraph)
             mesh = evaluated.to_mesh()
             try:
                 if len(mesh.vertices) != len(obj.data.vertices):
                     continue
                 matrix = evaluated.matrix_world
-                for i, base_vert in enumerate(obj.data.vertices):
-                    if not any(group.group in groups and group.weight >= 0.05
-                               for group in base_vert.groups):
-                        continue
+                matched = [i for i, base_vert in enumerate(obj.data.vertices)
+                           if any(group.group in groups and group.weight >= 0.05
+                                  for group in base_vert.groups)]
+                if matched:
+                    methods.add("vertex_weights")
+                else:
+                    # MPFB rigs may not name skin groups like their armature
+                    # bones. Use local posed skin samples around distal tip,
+                    # and report this weaker fallback explicitly.
+                    tip_world = rig.matrix_world @ rig.pose.bones[bones[-1]].tail
+                    matched = [i for i, v in enumerate(mesh.vertices)
+                               if (matrix @ v.co - tip_world).length < 0.03]
+                    if matched:
+                        methods.add("near_bone_tip_30mm")
+                for i in matched:
                     point = matrix @ mesh.vertices[i].co
                     sample_count += 1
                     distance = (point - goal).length
@@ -53,6 +65,8 @@ def inspect_card_skin(rig, card, side, names, body_objects):
         report["fingers"][finger] = {
             "target": [float(v) for v in goal],
             "sample_count": sample_count,
+            "selection_methods": sorted(methods),
+            "available_finger_groups_sample": available_groups[:12],
             "nearest_skin_vertex": best,
             "sampled_vertices_inside_card": inside_count,
             "has_penetration_evidence": inside_count > 0,
