@@ -108,3 +108,8 @@ The semantic `present_card` action uses `poseforge/pose_prior.py` to apply a con
 `poseforge/grip_targets.py` accepts a set of world-space grip frames with `hand` (`left` / `right`), `grip_world`, `wrist_offset`, and `approach_axis_world`. It applies position IK to each wrist, then a **bounded** wrist rotation (at most 0.20 radians) toward the chosen hand axis, and remeasures both wrists. The result reports wrist-position error and the angle between the measured wrist-to-index-knuckle vector and the requested approach axis.
 
 Two different objects now share this solver: `render-hold-bow` and `render-hold-staff` (see `examples/human_staff_hold.json`). Both produce six views from one unchanged 3D scene, with one rigid prop. These grip frames are internal Blender-facing data; direct arbitrary-prop JSON authoring is a future milestone. Neither contact, finger wrapping, collision avoidance, nor anatomically valid wrist orientation is verified by this first pass.
+
+
+## Cylindrical handle finger prior (experimental)
+
+Bow and staff now share a grip template in `poseforge/grip_pose.py`. After arm IK, the solver evaluates two opposite signs of MPFB local finger curl, chooses the lower **skeletal fingertip-to-handle-axis proxy cost**, then records per-finger distances, trials, and the chosen sign in `targets[].finger_grip_prior` of `report.json`. Handle axis/radius are defined by the same prop's grip frame. It is a geometry experiment; local angles and actual palm/finger skin contact have **not** been anatomically calibrated. It cannot prove a realistic wrap, joint compliance, nor absence of intersections. Images from front/back/side/hand_closeup remain essential.
