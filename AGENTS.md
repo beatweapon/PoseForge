@@ -17,3 +17,12 @@
 - 指をカードから単に遠ざけると「貫通しないが保持していない」という別の失敗になる。次のソルバーは **指腹の接触点・手首の向き・関節可動域・メッシュ貫通の回避** を一緒に評価すること。
 - スモークCIはコマンドと画像生成の回帰検出、把持品質は別のメトリクスとして明示する。CIの緑は自然なポーズの保証ではない。
 - 同じ数値最適化を繰り返して改善しない場合は、その目的関数や接触表現を見直す。複数視点画像も取得し確認する。
+
+
+## Semantic display-card experiments and decision (2026-11-03)
+
+- `present_card` now specifies actor-relative chest placement from the model's shoulder rather than raw XYZ. A realistic playing-card sample is 80x120mm.
+- Experiment 1: wrist seed inherited from neutral finger offsets; arm raised to upper chest, but fingers drape downward and do not visibly pinch.
+- Experiment 2: forced 65mm lateral wrist seed; sampled mesh intersections dropped from 10 to 2, **but screenshots showed severe wrist/finger twisting**. This variant was reverted. Never choose pose quality by sampled intersection count alone.
+- For the next implementation, replace arbitrary CCD-as-primary-poser with a **grasp pose prior/template** (fingers/palm facing each other in a plausible pinching hand shape), then constrain wrist position/orientation, elbow bend and limited finger corrections. Explicitly measure local bone rotation and reject grossly twisted candidates. Validate with front/side/hand closeup, not only JSON.
+- Current `present_card` is a placement and instrumentation prototype; do not claim it produces a natural card grip.
