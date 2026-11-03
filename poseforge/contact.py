@@ -15,9 +15,12 @@ def inspect_card_skin(rig, card, side, names, body_objects):
     size = card.dimensions.copy()
     targets = card_face_targets(center, size)
     depsgraph = __import__("bpy").context.evaluated_depsgraph_get()
-    report = {"method": "weighted_vertices_with_tip_proximity_fallback",
+    report = {"method": "weighted_vertices_with_voronoi_tip_fallback",
               "is_exact_collision_test": False, "fingers": {}}
 
+    tips = {finger: rig.matrix_world @
+            rig.pose.bones[names[f"{side}_{finger}_3"]].tail
+            for finger in ("thumb", "index")}
     for finger in ("thumb", "index"):
         bones = ([names[f"{side}_{finger}_{joint}"] for joint in (2, 3)]
                  + mpfb_skin_groups(side, finger))
@@ -25,6 +28,9 @@ def inspect_card_skin(rig, card, side, names, body_objects):
         best = None
         sample_count = 0
         inside_count = 0
+        nearest_outside_surface_gap = None
+        face_sign = 1 if finger == "thumb" else -1
+        face_y = center.y + face_sign * size.y / 2
         methods = set()
         available_groups = []
         topology_counts = []
@@ -52,11 +58,14 @@ def inspect_card_skin(rig, card, side, names, body_objects):
                     # MPFB rigs may not name skin groups like their armature
                     # bones. Use local posed skin samples around distal tip,
                     # and report this weaker fallback explicitly.
-                    tip_world = rig.matrix_world @ rig.pose.bones[names[f"{side}_{finger}_3"]].tail
+                    own = tips[finger]
+                    other = tips["index" if finger == "thumb" else "thumb"]
                     matched = [i for i, v in enumerate(mesh.vertices)
-                               if (matrix @ v.co - tip_world).length < 0.03]
+                               if (matrix @ v.co - own).length < 0.03
+                               and (matrix @ v.co - own).length <=
+                                   (matrix @ v.co - other).length]
                     if matched:
-                        methods.add("near_bone_tip_30mm")
+                        methods.add("nearest_bone_tip_voronoi_30mm")
                 for i in matched:
                     point = matrix @ mesh.vertices[i].co
                     sample_count += 1
@@ -64,6 +73,14 @@ def inspect_card_skin(rig, card, side, names, body_objects):
                     if best is None or distance < best["distance_m"]:
                         best = {"distance_m": float(distance),
                                 "vertex_position": [float(v) for v in point]}
+                    # Signed exterior clearance at the selected card face;
+                    # only measure vertices near the intended corner.
+                    if (abs(point.x - goal.x) < 0.035 and
+                            abs(point.z - goal.z) < 0.035):
+                        gap = face_sign * (point.y - face_y)
+                        if gap >= 0 and (nearest_outside_surface_gap is None or
+                                         gap < nearest_outside_surface_gap):
+                            nearest_outside_surface_gap = float(gap)
                     if (abs(point.x - center.x) < size.x / 2 and
                             abs(point.y - center.y) < size.y / 2 and
                             abs(point.z - center.z) < size.z / 2):
@@ -73,6 +90,7 @@ def inspect_card_skin(rig, card, side, names, body_objects):
         report["fingers"][finger] = {
             "target": [float(v) for v in goal],
             "sample_count": sample_count,
+            "nearest_outside_face_gap_m": nearest_outside_surface_gap,
             "selection_methods": sorted(methods),
             "mesh_topology_counts": topology_counts,
             "available_finger_groups_sample": available_groups[:12],
