@@ -4,6 +4,7 @@ Uses posed vertices assigned to distal finger bones; not continuous collision
 detection or a guarantee of true skin-to-surface contact.
 """
 from mathutils import Vector
+from rig import mpfb_skin_groups
 
 
 def inspect_card_skin(rig, card, side, names, body_objects):
@@ -18,7 +19,8 @@ def inspect_card_skin(rig, card, side, names, body_objects):
               "is_exact_collision_test": False, "fingers": {}}
 
     for finger in ("thumb", "index"):
-        bones = [names[f"{side}_{finger}_{joint}"] for joint in (2, 3)]
+        bones = ([names[f"{side}_{finger}_{joint}"] for joint in (2, 3)]
+                 + mpfb_skin_groups(side, finger))
         goal = targets[finger]
         best = None
         sample_count = 0
@@ -44,7 +46,7 @@ def inspect_card_skin(rig, card, side, names, body_objects):
                     # MPFB rigs may not name skin groups like their armature
                     # bones. Use local posed skin samples around distal tip,
                     # and report this weaker fallback explicitly.
-                    tip_world = rig.matrix_world @ rig.pose.bones[bones[-1]].tail
+                    tip_world = rig.matrix_world @ rig.pose.bones[names[f"{side}_{finger}_3"]].tail
                     matched = [i for i, v in enumerate(mesh.vertices)
                                if (matrix @ v.co - tip_world).length < 0.03]
                     if matched:
