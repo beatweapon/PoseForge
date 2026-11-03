@@ -30,6 +30,7 @@ def main():
                "The render pass checks command success and output images, not anatomical validity.",
                "", "| Scenario | Result | IK error (m) |", "|---|---|---|"]
     failures = []
+    geometry_notes = []
     for sample, cmd, scene_name in SCENES:
         config = json.loads((ROOT / "examples" / sample).read_text(encoding="utf-8"))
         config["model"]["source"] = str((ROOT / "assets" / "human.blend").resolve())
@@ -73,13 +74,22 @@ def main():
                 item = fingers.get(finger, {})
                 if not item.get("sample_count") or not item.get("nearest_skin_vertex"):
                     problems.append(f"missing posed skin samples for {finger}")
+        if scene_name == "card_grasp" and report:
+            fingers = (report.get("skin_contact_diagnostics") or {}).get("fingers", {})
+            for finger in ("thumb", "index"):
+                data = fingers.get(finger) or {}
+                count = data.get("sampled_vertices_inside_card")
+                nearest = (data.get("nearest_skin_vertex") or {}).get("distance_m")
+                geometry_notes.append(
+                    f"- {finger}: mesh vertices inside card = {count}, "
+                    f"nearest sampled skin vertex to face target = {nearest} m")
         error_text = ", ".join(map(str, errors)) if errors else "—"
         if problems:
             failures.append(scene_name + ": " + "; ".join(problems))
         summary.append("| " + scene_name + " | " +
                        ("FAIL: " + "; ".join(problems) if problems else "PASS") +
                        " | " + error_text + " |")
-    summary += ["", "CCD convergence does not guarantee valid joint limits or contact.",
+    summary += ["", "### Card skin geometry (diagnostic only)", *geometry_notes, "", "CCD convergence does not guarantee valid joint limits or contact.",
                 "Artifacts: PNG views and report.json for each scenario.", ""]
     (OUT / "summary.md").write_text("\n".join(summary), encoding="utf-8")
     print("\n".join(summary), flush=True)
