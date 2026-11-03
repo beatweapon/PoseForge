@@ -69,7 +69,8 @@ def hold_bow(rig, specification):
     grip_frames = [
         {"hand": side, "grip_world": prop["grips"][side],
          "wrist_offset": [0, 0.012, 0.078],
-         "approach_axis_world": [0, 0, -1]}
+         "approach_axis_world": [0, 0, -1],
+         "handle_axis_world": [1, 0, 0], "handle_radius_m": 0.012}
         for side in ("right", "left")
     ]
     results = solve_grip_frames(rig, grip_frames)
