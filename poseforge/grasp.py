@@ -156,3 +156,105 @@ def solve_card_grasp(rig, spec):
         "orientation_trials": orientation_trials,
     }
     return card, arm, final_results
+
+
+def refine_skin_grasp(rig, card, side, body_objects, bone_targets, *, trials=4):
+    """Bounded mesh-aware wrist pose search; never worsens the measured objective.
+
+    All candidates are measured against the *evaluated skin*, not just bone
+    tips. The evaluator samples vertices; it does not prove collision freedom.
+    """
+    from contact import inspect_card_skin
+
+    bones = rig.pose.bones
+    names = semantic_bones(bones.keys())
+    wrist = wrist_bone_name(side)
+    chains = {
+        finger: [names[f"{side}_{finger}_{i}"] for i in (3, 2, 1)]
+        for finger in ("thumb", "index")
+    }
+    involved = [wrist] + [name for chain in chains.values() for name in chain]
+    involved = list(dict.fromkeys(involved))
+    ordered = sorted(involved, key=lambda name: len(bones[name].parent_recursive))
+
+    def snapshot():
+        return {name: bones[name].matrix.copy() for name in involved}
+
+    def restore(saved):
+        for name in ordered:
+            bones[name].matrix = saved[name]
+            bpy.context.view_layer.update()
+
+    def errors():
+        bpy.context.view_layer.update()
+        return {
+            finger: float((rig.matrix_world @ bones[names[f"{side}_{finger}_3"]].tail
+                           - bone_targets[finger]).length)
+            for finger in ("thumb", "index")
+        }
+
+    def evaluate():
+        metrics = inspect_card_skin(rig, card, side, names, body_objects)
+        error = errors()
+        samples = [metrics["fingers"].get(f, {}) for f in ("thumb", "index")]
+        if any(not row.get("sample_count") for row in samples):
+            return float("inf"), metrics, error
+        penetration = sum(row.get("sampled_vertices_inside_card", 0)
+                          for row in samples)
+        # Penalize penetration more than small surface-distance variation.
+        gap = sum(
+            min(row["nearest_outside_face_gap_m"], 0.03)
+            if row.get("nearest_outside_face_gap_m") is not None else 0.03
+            for row in samples)
+        # Preserve goal proximity; large bone-tip changes are unacceptable.
+        tip_cost = sum(max(0.0, e - 0.005) * 10 for e in error.values())
+        return penetration * 0.02 + gap + tip_cost, metrics, error
+
+    best_score, initial_metrics, initial_errors = evaluate()
+    best_pose = snapshot()
+    initial_inside = sum(
+        row.get("sampled_vertices_inside_card", 0)
+        for row in initial_metrics["fingers"].values())
+    trace = [{"trial": "initial", "score": best_score,
+              "inside": initial_inside, "tip_errors": initial_errors}]
+    experiments = [
+        ((1, 0, 0), 0.15), ((1, 0, 0), -0.15),
+        ((0, 0, 1), 0.15), ((0, 0, 1), -0.15),
+    ][:trials]
+
+    for axis, angle in experiments:
+        restore(best_pose)
+        pivot = bones[wrist].head.copy()
+        delta = Quaternion(Vector(axis), angle).to_matrix().to_4x4()
+        bones[wrist].matrix = (Matrix.Translation(pivot) @ delta
+                               @ Matrix.Translation(-pivot) @ bones[wrist].matrix)
+        bpy.context.view_layer.update()
+        for finger in ("thumb", "index"):
+            solve_tip(rig, chains[finger], bone_targets[finger])
+        score, metrics, tip_errors = evaluate()
+        inside = sum(row.get("sampled_vertices_inside_card", 0)
+                     for row in metrics["fingers"].values())
+        trace.append({"trial": f"wrist_{axis}_{angle:+.2f}",
+                      "score": score, "inside": inside,
+                      "tip_errors": tip_errors})
+        if score < best_score - 1e-7:
+            best_score = score
+            best_pose = snapshot()
+
+    restore(best_pose)
+    final_score, final_metrics, final_errors = evaluate()
+    return {
+        "method": "bounded_wrist_orientation_skin_vertex_search",
+        "status": "improved" if final_score < trace[0]["score"] - 1e-7
+                  else "no_improvement",
+        "baseline_score": trace[0]["score"],
+        "final_score": final_score,
+        "baseline_inside": initial_inside,
+        "final_inside": sum(
+            row.get("sampled_vertices_inside_card", 0)
+            for row in final_metrics["fingers"].values()),
+        "final_tip_errors": final_errors,
+        "trials": trace,
+        "not_verified": ["continuous_collision", "joint_limits",
+                         "skin_contact", "grasp_force"],
+    }
