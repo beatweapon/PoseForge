@@ -63,12 +63,9 @@ def solve_card_grasp(rig, spec):
     target_middle = (targets["thumb"] + targets["index"]) / 2
     desired_wrist = rig.matrix_world @ (
         wrist_position + (rig.matrix_world.inverted() @ target_middle - middle))
-    # A display grip should approach the card from its side rather than
-    # letting a neutral A-pose determine a wrist location above the card.
-    # Keep the older unconstrained placement for direct grasp_card comparisons.
-    if spec["card"].get("presentation") == "chest_display":
-        lateral = 0.065 if side == "right" else -0.065
-        desired_wrist = target_middle + Vector((lateral, 0.01, -0.025))
+    # Keep the safe existing wrist seed for the semantic placement preview.
+    # A 65 mm lateral wrist seed reduced sampled intersections but produced
+    # severe hand twisting; do not use it without joint-angle constraints.
     arm_names = arm_chain(side, bones.keys())
     finger_chains = {
         finger: [names[f"{side}_{finger}_{j}"] for j in (3, 2, 1)]
