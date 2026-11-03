@@ -148,6 +148,20 @@ def main():
                     problems.append("missing hand direction metric")
                 if grip.get("orientation_step_limit_rad") != 0.20:
                     problems.append("wrong wrist orientation bound")
+                before = grip.get("palm_frame_before") or {}
+                after = grip.get("palm_frame_after") or {}
+                if before.get("plane_deg") is None or after.get("plane_deg") is None:
+                    problems.append("missing palm-plane diagnostic")
+                elif (after["forward_deg"] + 0.55 * after["plane_deg"] >
+                      before["forward_deg"] + 0.55 * before["plane_deg"] + 12):
+                    # The first 0.2-radian forward correction is allowed,
+                    # but a large secondary regression must be investigated.
+                    problems.append("palm-frame fit regressed substantially")
+                geometry_notes.append(
+                    "- " + scene_name + " " + grip["hand"]
+                    + " palm-plane angle "
+                    + str(before.get("plane_deg")) + " -> "
+                    + str(after.get("plane_deg")) + " deg")
                 prior = grip.get("finger_grip_prior") or {}
                 if prior.get("name") != "cylinder_finger_prior_v1":
                     problems.append("missing cylinder finger prior")
