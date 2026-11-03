@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from poseforge.schema import load_config
-from poseforge.rig import classify_bones, semantic_bones
+from poseforge.rig import classify_bones, semantic_bones, mpfb_skin_groups
 
 SAMPLE = {"model": {"type": "mpfb", "source": "human.blend"},
           "pose": {"action": "neutral"}, "cameras": ["front", "back"],
@@ -91,6 +91,12 @@ class ConfigTests(unittest.TestCase):
                                  "size": [0.18, 0.006, 0.25]}}
         with self.assertRaises(ValueError):
             self.load(data)
+
+    def test_mpfb_skin_groups(self):
+        self.assertIn("joint-r-finger-1-3", mpfb_skin_groups("right", "thumb"))
+        self.assertIn("joint-l-finger-2-4", mpfb_skin_groups("left", "index"))
+        with self.assertRaises(ValueError):
+            mpfb_skin_groups("right", "elbow")
 
     def test_mpfb_fingers(self):
         bones = ["finger1-1.R", "finger2-3.L", "upperleg01.R", "wrist.R"]
