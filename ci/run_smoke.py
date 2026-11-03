@@ -155,6 +155,10 @@ def main():
                       len(prior.get("trials", [])) != 2):
                     problems.append("incomplete finger grip diagnostics")
                 else:
+                    previous = prior["baseline_axis_distances_m"]["index"]
+                    updated = prior["final_axis_distances_m"]["index"]
+                    if updated >= previous:
+                        problems.append("index finger did not approach handle axis")
                     geometry_notes.append(
                         "- " + scene_name + " " + grip["hand"]
                         + " finger sign=" + str(prior["selected_flexion_sign"])
