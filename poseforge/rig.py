@@ -56,3 +56,17 @@ def wrist_bone_name(side):
     if side not in ARM_CHAINS:
         raise ValueError(f"Unknown hand side: {side}")
     return "wrist." + ("R" if side == "right" else "L")
+
+
+def mpfb_skin_groups(side, finger):
+    """MPFB mesh skin-group aliases; distinct from armature bone names.
+
+    MPFB default bone: finger1-3.R
+    MPFB mesh vertex group: joint-r-finger-1-3
+    """
+    if side not in ("left", "right") or finger not in FINGERS:
+        raise ValueError("Unknown finger or side")
+    digit = FINGERS.index(finger) + 1
+    suffix = "r" if side == "right" else "l"
+    return [f"joint-{suffix}-finger-{digit}-{segment}"
+            for segment in (2, 3, 4)]
