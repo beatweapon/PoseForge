@@ -75,6 +75,16 @@ def main():
                 if not item.get("sample_count") or not item.get("nearest_skin_vertex"):
                     problems.append(f"missing posed skin samples for {finger}")
         if scene_name == "card_grasp" and report:
+            skin_search = report.get("skin_search") or {}
+            if not skin_search.get("trials"):
+                problems.append("missing skin-aware search trials")
+            elif skin_search["final_score"] > skin_search["baseline_score"] + 1e-6:
+                problems.append("skin-aware search regressed its objective")
+            geometry_notes.append(
+                f"- skin search: {skin_search.get('status')} "
+                f"score {skin_search.get('baseline_score')} -> "
+                f"{skin_search.get('final_score')}; sampled intersections "
+                f"{skin_search.get('baseline_inside')} -> {skin_search.get('final_inside')}")
             fingers = (report.get("skin_contact_diagnostics") or {}).get("fingers", {})
             for finger in ("thumb", "index"):
                 data = fingers.get(finger) or {}
