@@ -8,9 +8,9 @@
     "hand": "right",
     "presentation": "chest_display",
     "size": [
-      0.18,
-      0.006,
-      0.25
+      0.08,
+      0.003,
+      0.12
     ]
   },
   "cameras": [
