@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rig import semantic_bones, arm_chain, wrist_bone_name
 from ik import solve_tip, solve_hand_reach
 from grasp import solve_card_grasp
+from contact import inspect_card_skin
 
 
 def look_at(cam, point):
@@ -91,6 +92,11 @@ def main():
                                             for m in o.modifiers))]
     if not mesh_objs:
         raise RuntimeError("No body mesh in model")
+    skin_contact = None
+    if grasp_card is not None:
+        mapping = semantic_bones(rig.pose.bones.keys())
+        skin_contact = inspect_card_skin(
+            rig, grasp_card, cfg["pose"]["hand"], mapping, mesh_objs)
     points = [o.matrix_world @ Vector(corner) for o in mesh_objs for corner in o.bound_box]
     low = Vector((min(p[i] for p in points) for i in range(3)))
     high = Vector((max(p[i] for p in points) for i in range(3)))
@@ -148,6 +154,7 @@ def main():
         status = "grasp_preview_within_tolerance" if all(r["converged"] for r in reach_results) else "grasp_preview_unconverged"
     report = {"status": status, "targets": reach_results,
               "arm_reach": grasp_arm, "card": cfg["pose"].get("card"),
+              "skin_contact_diagnostics": skin_contact,
               "pose_action": cfg["pose"]["action"], "contact_verified": False,
               "collision_verified": False, "views": cfg["cameras"],
               "model": cfg["model"]["source"]}
