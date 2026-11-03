@@ -14,6 +14,7 @@ from rig import semantic_bones, arm_chain, wrist_bone_name
 from ik import solve_tip, solve_hand_reach
 from grasp import solve_card_grasp, refine_skin_grasp, card_face_targets, _measure
 from contact import inspect_card_skin
+from presentation import resolve_card_presentation, measure_arm_posture
 
 
 def look_at(cam, point):
@@ -68,6 +69,7 @@ def main():
     reach_results = []
     grasp_arm = None
     grasp_card = None
+    presented_card = None
     if cfg["pose"]["action"] == "pinch_preview":
         preview_pose(rig)
     elif cfg["pose"]["action"] == "reach":
@@ -86,6 +88,13 @@ def main():
         reach_results.append(result)
     elif cfg["pose"]["action"] == "grasp_card":
         grasp_card, grasp_arm, reach_results = solve_card_grasp(rig, cfg["pose"])
+    elif cfg["pose"]["action"] == "present_card":
+        spec = cfg["pose"]
+        bpy.context.view_layer.update()
+        presented_card = resolve_card_presentation(
+            rig, spec["hand"], spec["size"], spec["presentation"])
+        grasp_card, grasp_arm, reach_results = solve_card_grasp(
+            rig, {"hand": spec["hand"], "card": presented_card})
     mesh_objs = [o for o in bpy.data.objects
                  if o.type == "MESH" and o.name not in ("Card_preview_NOT_contact_solved", "Card_grasp_preview")
                  and (o.parent == rig or any(m.type == "ARMATURE" and m.object == rig
@@ -95,10 +104,11 @@ def main():
     skin_contact = None
     grasp_skin_search = None
     if grasp_card is not None:
+        card_spec = presented_card or cfg["pose"]["card"]
         side = cfg["pose"]["hand"]
         mapping = semantic_bones(rig.pose.bones.keys())
         targets = card_face_targets(
-            cfg["pose"]["card"]["position"], cfg["pose"]["card"]["size"])
+            card_spec["position"], card_spec["size"])
         grasp_skin_search = refine_skin_grasp(
             rig, grasp_card, side, mesh_objs, targets)
         reach_results = _measure(rig, rig.pose.bones, mapping, side, targets)
@@ -159,7 +169,7 @@ def main():
     status = ("neutral" if action == "neutral" else
               "ik_converged" if action in ("reach", "reach_hand") and all(r["converged"] for r in reach_results)
               else "ik_unconverged" if action in ("reach", "reach_hand") else "pose_preview_only")
-    if action == "grasp_card":
+    if action in ("grasp_card", "present_card"):
         status = "grasp_preview_within_tolerance" if all(r["converged"] for r in reach_results) else "grasp_preview_unconverged"
     skin_quality = None
     if skin_contact is not None:
@@ -169,9 +179,12 @@ def main():
                 item.get("has_penetration_evidence")
                 for item in fingers.values()) else "not_verified"
         )
+    posture = (measure_arm_posture(rig, cfg["pose"]["hand"])
+               if grasp_card is not None else None)
     report = {"status": status, "skin_quality": skin_quality,
+              "arm_posture": posture, "presentation": presented_card,
               "targets": reach_results,
-              "arm_reach": grasp_arm, "card": cfg["pose"].get("card"),
+              "arm_reach": grasp_arm, "card": presented_card or cfg["pose"].get("card"),
               "skin_contact_diagnostics": skin_contact,
               "skin_search": grasp_skin_search,
               "pose_action": cfg["pose"]["action"], "contact_verified": False,
