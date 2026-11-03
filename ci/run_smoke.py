@@ -148,6 +148,20 @@ def main():
                     problems.append("missing hand direction metric")
                 if grip.get("orientation_step_limit_rad") != 0.20:
                     problems.append("wrong wrist orientation bound")
+                prior = grip.get("finger_grip_prior") or {}
+                if prior.get("name") != "cylinder_finger_prior_v1":
+                    problems.append("missing cylinder finger prior")
+                elif (len(prior.get("final_axis_distances_m", {})) != 5 or
+                      len(prior.get("trials", [])) != 2):
+                    problems.append("incomplete finger grip diagnostics")
+                else:
+                    geometry_notes.append(
+                        "- " + scene_name + " " + grip["hand"]
+                        + " finger sign=" + str(prior["selected_flexion_sign"])
+                        + "; index axis distance " +
+                        str(prior["baseline_axis_distances_m"]["index"])
+                        + " -> " +
+                        str(prior["final_axis_distances_m"]["index"]))
             if scene_name == "staff_hold":
                 prop = report.get("bow_prop") or {}
                 if prop.get("kind") != "staff" or not prop.get("shared_scene"):
