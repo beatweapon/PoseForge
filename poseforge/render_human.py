@@ -12,6 +12,7 @@ from mathutils import Vector
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rig import semantic_bones, arm_chain, wrist_bone_name
 from ik import solve_tip, solve_hand_reach
+from grasp import solve_card_grasp
 
 
 def look_at(cam, point):
@@ -64,6 +65,8 @@ def main():
                 and all(abs(d - 2.0) < 0.001 for d in obj.dimensions)):
             bpy.data.objects.remove(obj, do_unlink=True)
     reach_results = []
+    grasp_arm = None
+    grasp_card = None
     if cfg["pose"]["action"] == "pinch_preview":
         preview_pose(rig)
     elif cfg["pose"]["action"] == "reach":
@@ -80,8 +83,10 @@ def main():
         result = solve_hand_reach(rig, side, wrist_bone_name(side), chain,
                                   cfg["pose"]["target_position"])
         reach_results.append(result)
+    elif cfg["pose"]["action"] == "grasp_card":
+        grasp_card, grasp_arm, reach_results = solve_card_grasp(rig, cfg["pose"])
     mesh_objs = [o for o in bpy.data.objects
-                 if o.type == "MESH" and o.name != "Card_preview_NOT_contact_solved"
+                 if o.type == "MESH" and o.name not in ("Card_preview_NOT_contact_solved", "Card_grasp_preview")
                  and (o.parent == rig or any(m.type == "ARMATURE" and m.object == rig
                                             for m in o.modifiers))]
     if not mesh_objs:
@@ -97,6 +102,8 @@ def main():
     close_target = rig.matrix_world @ wrist.head if wrist else center
     if reach_results:
         close_target = Vector(reach_results[0]["actual"])
+    if grasp_card is not None:
+        close_target = grasp_card.matrix_world.translation
     if cfg["pose"]["action"] == "pinch_preview":
         card = bpy.data.objects.get("Card_preview_NOT_contact_solved")
         if card is not None:
@@ -137,7 +144,10 @@ def main():
     status = ("neutral" if action == "neutral" else
               "ik_converged" if action in ("reach", "reach_hand") and all(r["converged"] for r in reach_results)
               else "ik_unconverged" if action in ("reach", "reach_hand") else "pose_preview_only")
+    if action == "grasp_card":
+        status = "grasp_preview_within_tolerance" if all(r["converged"] for r in reach_results) else "grasp_preview_unconverged"
     report = {"status": status, "targets": reach_results,
+              "arm_reach": grasp_arm, "card": cfg["pose"].get("card"),
               "pose_action": cfg["pose"]["action"], "contact_verified": False,
               "collision_verified": False, "views": cfg["cameras"],
               "model": cfg["model"]["source"]}
