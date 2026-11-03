@@ -113,3 +113,8 @@ Two different objects now share this solver: `render-hold-bow` and `render-hold-
 ## Cylindrical handle finger prior (experimental)
 
 Bow and staff now share a grip template in `poseforge/grip_pose.py`. After arm IK, the solver evaluates two opposite signs of MPFB local finger curl, chooses the lower **skeletal fingertip-to-handle-axis proxy cost**, then records per-finger distances, trials, and the chosen sign in `targets[].finger_grip_prior` of `report.json`. Handle axis/radius are defined by the same prop's grip frame. It is a geometry experiment; local angles and actual palm/finger skin contact have **not** been anatomically calibrated. It cannot prove a realistic wrap, joint compliance, nor absence of intersections. Images from front/back/side/hand_closeup remain essential.
+
+
+## Palm-plane grip orientation (experimental)
+
+The shared prop solver now estimates a hand plane from the wrist, index knuckle, and pinky knuckle. It reports `palm_frame_before` and `palm_frame_after` on each grip, and evaluates a small plus/minus 0.16-radian wrist roll without allowing a worse combined direction/plane score. The palm plane is deliberately **unoriented**: without calibrating the mesh's palm-facing side, its normal is ambiguous. This is not yet correct palm-to-handle surface contact, and skeletal proximity alone must never be treated as a verified hold. CI includes both bow and staff regressions.
