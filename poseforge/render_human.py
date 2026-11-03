@@ -12,7 +12,7 @@ from mathutils import Vector
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rig import semantic_bones, arm_chain, wrist_bone_name
 from ik import solve_tip, solve_hand_reach
-from grasp import solve_card_grasp
+from grasp import solve_card_grasp, refine_skin_grasp, card_face_targets, _measure
 from contact import inspect_card_skin
 
 
@@ -93,10 +93,19 @@ def main():
     if not mesh_objs:
         raise RuntimeError("No body mesh in model")
     skin_contact = None
+    grasp_skin_search = None
     if grasp_card is not None:
+        side = cfg["pose"]["hand"]
         mapping = semantic_bones(rig.pose.bones.keys())
+        targets = card_face_targets(
+            cfg["pose"]["card"]["position"], cfg["pose"]["card"]["size"])
+        grasp_skin_search = refine_skin_grasp(
+            rig, grasp_card, side, mesh_objs, targets)
+        reach_results = _measure(rig, rig.pose.bones, mapping, side, targets)
+        for row in reach_results:
+            row["sample_point"] = "bone_tail"
         skin_contact = inspect_card_skin(
-            rig, grasp_card, cfg["pose"]["hand"], mapping, mesh_objs)
+            rig, grasp_card, side, mapping, mesh_objs)
     points = [o.matrix_world @ Vector(corner) for o in mesh_objs for corner in o.bound_box]
     low = Vector((min(p[i] for p in points) for i in range(3)))
     high = Vector((max(p[i] for p in points) for i in range(3)))
@@ -164,6 +173,7 @@ def main():
               "targets": reach_results,
               "arm_reach": grasp_arm, "card": cfg["pose"].get("card"),
               "skin_contact_diagnostics": skin_contact,
+              "skin_search": grasp_skin_search,
               "pose_action": cfg["pose"]["action"], "contact_verified": False,
               "collision_verified": False, "views": cfg["cameras"],
               "model": cfg["model"]["source"]}
