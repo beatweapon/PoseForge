@@ -31,6 +31,24 @@ def add_card(position, size):
     card.data.materials.append(mat)
     return card
 
+def _measure(rig, bones, names, side, targets):
+    """Measure both tips AFTER all pose operations, in world coordinates."""
+    bpy.context.view_layer.update()
+    out = []
+    for finger in ("thumb", "index"):
+        actual = rig.matrix_world @ bones[names[f"{side}_{finger}_3"]].tail
+        target = targets[finger]
+        error = (actual - target).length
+        out.append({"effector": f"{side}_{finger}",
+                    "face": "front" if finger == "thumb" else "back",
+                    "target": [float(v) for v in target],
+                    "actual": [float(v) for v in actual],
+                    "delta_world": [float(v) for v in target - actual],
+                    "error_m": round(error, 6),
+                    "converged": error <= 0.003})
+    return out
+
+
 def solve_card_grasp(rig, spec):
     side = spec["hand"]
     targets = card_face_targets(spec["card"]["position"], spec["card"]["size"])
@@ -40,28 +58,72 @@ def solve_card_grasp(rig, spec):
     wrist = wrist_bone_name(side)
     finger_tips = [names[f"{side}_{f}_3"] for f in ("thumb", "index")]
     bpy.context.view_layer.update()
-    # Move the wrist by the current averaged fingertip offset before finger fitting.
     middle = sum((bones[n].tail.copy() for n in finger_tips), Vector()) / 2
     wrist_position = bones[wrist].head.copy()
     target_middle = (targets["thumb"] + targets["index"]) / 2
-    desired_wrist = rig.matrix_world @ (wrist_position +
-                    (rig.matrix_world.inverted() @ target_middle - middle))
-    arm = solve_hand_reach(rig, side, wrist, arm_chain(side, bones.keys()), desired_wrist)
-    results = []
-    for finger in ("thumb", "index"):
-        chain = [names[f"{side}_{finger}_{j}"] for j in (3, 2, 1)]
-        result = solve_tip(rig, chain, targets[finger])
-        result["effector"] = f"{side}_{finger}"
-        result["face"] = "front" if finger == "thumb" else "back"
-        results.append(result)
-    # First finger may move when subsequent solves are applied; report FINAL positions.
-    bpy.context.view_layer.update()
-    for result in results:
-        finger = result["effector"].split("_", 1)[1]
-        actual = rig.matrix_world @ bones[names[f"{side}_{finger}_3"]].tail
-        target = targets[finger]
-        result["actual"] = [float(v) for v in actual]
-        result["error_m"] = round((actual - target).length, 6)
-        result["converged"] = result["error_m"] <= 0.003
-        result["delta_world"] = [float(v) for v in target - actual]
-    return card, arm, results
+    desired_wrist = rig.matrix_world @ (
+        wrist_position + (rig.matrix_world.inverted() @ target_middle - middle))
+    arm_names = arm_chain(side, bones.keys())
+    finger_chains = {
+        finger: [names[f"{side}_{finger}_{j}"] for j in (3, 2, 1)]
+        for finger in ("thumb", "index")
+    }
+
+    def fit_fingers():
+        for finger in ("thumb", "index"):
+            solve_tip(rig, finger_chains[finger], targets[finger])
+        return _measure(rig, bones, names, side, targets)
+
+    arm = solve_hand_reach(rig, side, wrist, arm_names, desired_wrist)
+    results = fit_fingers()
+    initial_max_error = max(r["error_m"] for r in results)
+    best_score = sum(r["error_m"] ** 2 for r in results)
+    optimized_bones = list(dict.fromkeys(arm_names + sum(finger_chains.values(), [])))
+    best_pose = {name: bones[name].matrix.copy() for name in optimized_bones}
+    history = [{"pass": 0, "max_error_m": initial_max_error,
+                "sum_square_error": best_score}]
+
+    # A two-stage solve can leave the thumb out of reach. Adjust the wrist
+    # towards the residual of both finger goals, then re-fit each finger.
+    # Preserve the best pose so extra passes can never regress the measured
+    # bone-tip objective. This is not collision-aware or anatomically constrained.
+    for attempt in range(1, 5):
+        residual = sum((targets[finger] -
+                        rig.matrix_world @ bones[names[f"{side}_{finger}_3"]].tail
+                        for finger in ("thumb", "index")), Vector()) / 2
+        if residual.length < 0.001:
+            break
+        # Limit arm translation correction to 25 mm per pass.
+        if residual.length > 0.025:
+            residual.normalize()
+            residual *= 0.025
+        current_wrist = rig.matrix_world @ bones[wrist].head
+        arm = solve_hand_reach(rig, side, wrist, arm_names,
+                               current_wrist + residual)
+        candidate = fit_fingers()
+        score = sum(r["error_m"] ** 2 for r in candidate)
+        history.append({"pass": attempt,
+                        "max_error_m": max(r["error_m"] for r in candidate),
+                        "sum_square_error": score})
+        if score + 1e-10 < best_score:
+            best_score = score
+            best_pose = {name: bones[name].matrix.copy() for name in optimized_bones}
+        else:
+            # No systematic progress: don't keep accumulating distorted poses.
+            break
+
+    # Restore poses in hierarchy order (parents before children) so child
+    # matrices are not shifted by later parent restoration.
+    for name in sorted(optimized_bones, key=lambda n: len(bones[n].parent_recursive)):
+        bones[name].matrix = best_pose[name]
+        bpy.context.view_layer.update()
+    final_results = _measure(rig, bones, names, side, targets)
+    for row in final_results:
+        row["sample_point"] = "bone_tail"
+    arm["optimization"] = {
+        "passes": history,
+        "initial_max_error_m": initial_max_error,
+        "final_max_error_m": max(row["error_m"] for row in final_results),
+        "strategy": "wrist residual refinement with best-pose rollback",
+    }
+    return card, arm, final_results
