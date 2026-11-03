@@ -7,7 +7,7 @@ from mathutils import Matrix, Quaternion, Vector
 from rig import arm_chain, wrist_bone_name, semantic_bones
 from ik import solve_hand_reach, solve_tip
 
-def card_face_targets(position, size, corner="top_right", clearance=0.002):
+def card_face_targets(position, size, corner="top_right", clearance=0.010):
     """Top-right corner on both faces, inset 12 mm to stay on each face."""
     if corner != "top_right":
         raise ValueError("Unsupported corner")
