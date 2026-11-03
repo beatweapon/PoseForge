@@ -17,6 +17,7 @@ from contact import inspect_card_skin
 from presentation import resolve_card_presentation, measure_arm_posture
 from pose_prior import solve_card_with_prior
 from bow import hold_bow
+from staff import hold_staff
 
 
 def look_at(cam, point):
@@ -100,6 +101,8 @@ def main():
             rig, {"hand": spec["hand"], "card": presented_card})
     elif cfg["pose"]["action"] == "hold_bow":
         bow_prop, reach_results = hold_bow(rig, cfg["pose"])
+    elif cfg["pose"]["action"] == "hold_staff":
+        bow_prop, reach_results = hold_staff(rig, cfg["pose"])
     mesh_objs = [o for o in bpy.data.objects
                  if o.type == "MESH" and o.name not in ("Card_preview_NOT_contact_solved", "Card_grasp_preview")
                  and (o.parent == rig or any(m.type == "ARMATURE" and m.object == rig
@@ -193,7 +196,7 @@ def main():
     posture = (measure_arm_posture(rig, cfg["pose"]["hand"])
                if grasp_card is not None else None)
     if bow_prop is not None:
-        status = "bilateral_bow_reference" if all(r["converged"] for r in reach_results) else "bilateral_bow_wrist_unconverged"
+        status = "bilateral_prop_reference" if all(r["converged"] for r in reach_results) else "bilateral_prop_wrist_unconverged"
     report = {"status": status, "skin_quality": skin_quality,
               "bow_prop": bow_prop,
               "arm_posture": posture, "presentation": presented_card,
