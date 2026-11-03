@@ -56,12 +56,45 @@ def solve_card_with_prior(rig, spec):
     midpoint = (thumb + index) / 2
     goal_midpoint = (targets["thumb"] + targets["index"]) / 2
     wrist_world = rig.matrix_world @ bones[wrist_name].head
+    arm_names = arm_chain(side, bones.keys())
     arm = solve_hand_reach(
-        rig, side, wrist_name, arm_chain(side, bones.keys()),
+        rig, side, wrist_name, arm_names,
         wrist_world + goal_midpoint - midpoint
     )
 
-    # Apply limited correction: no more than 0.08 radians per joint step.
+    # Arm IK changes the palm orientation as a side effect. The initial goal
+    # was based on the *old* palm geometry, so remeasure the actual fingertips
+    # after each arm solve and re-target the wrist. Preserve the best pose.
+    def current_midpoint():
+        return (rig.matrix_world @ bones[names[f"{side}_thumb_3"]].tail
+                + rig.matrix_world @ bones[names[f"{side}_index_3"]].tail) / 2
+
+    best_mid_error = (goal_midpoint - current_midpoint()).length
+    best_arm = {name: bones[name].matrix.copy() for name in arm_names}
+    arm_history = [round(best_mid_error, 6)]
+    for attempt in range(9):
+        correction = goal_midpoint - current_midpoint()
+        if correction.length <= 0.008:
+            break
+        if correction.length > 0.08:
+            correction.normalize()
+            correction *= 0.08
+        wrist_world = rig.matrix_world @ bones[wrist_name].head
+        candidate_arm = solve_hand_reach(
+            rig, side, wrist_name, arm_names, wrist_world + correction)
+        measured = (goal_midpoint - current_midpoint()).length
+        arm_history.append(round(measured, 6))
+        if measured + 0.0001 < best_mid_error:
+            best_mid_error = measured
+            best_arm = {name: bones[name].matrix.copy() for name in arm_names}
+            arm = candidate_arm
+        else:
+            break
+    for name in sorted(arm_names, key=lambda name: len(bones[name].parent_recursive)):
+        bones[name].matrix = best_arm[name]
+        bpy.context.view_layer.update()
+
+    # Apply limited correction: no more than 0.04 radian per joint step.
     # Keep only the better of the two options to avoid visibly destroying
     # a decent prior merely to achieve a sub-millimetre bone-tip error.
     prior_errors = _measure(rig, bones, names, side, targets)
@@ -92,6 +125,8 @@ def solve_card_with_prior(rig, spec):
         row["sample_point"] = "bone_tail"
     arm["pose_prior"] = {
         "name": "pinch_v1",
+        "arm_midpoint_error_m": round(best_mid_error, 6),
+        "arm_midpoint_error_history_m": arm_history,
         "strategy": "local_bend_template_then_bounded_ik",
         "chosen": choice,
         "max_step_angle_rad": 0.04,
