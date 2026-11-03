@@ -118,3 +118,8 @@ Bow and staff now share a grip template in `poseforge/grip_pose.py`. After arm I
 ## Palm-plane grip orientation (experimental)
 
 The shared prop solver now estimates a hand plane from the wrist, index knuckle, and pinky knuckle. It reports `palm_frame_before` and `palm_frame_after` on each grip, and evaluates a small plus/minus 0.16-radian wrist roll without allowing a worse combined direction/plane score. The palm plane is deliberately **unoriented**: without calibrating the mesh's palm-facing side, its normal is ambiguous. This is not yet correct palm-to-handle surface contact, and skeletal proximity alone must never be treated as a verified hold. CI includes both bow and staff regressions.
+
+
+## Handle-first palm anchor experiment
+
+The shared bow/staff grip solver now derives a **skeletal palm target** from the rigid handle axis, grip center, handle radius, and the desired hand approach direction. It estimates the palm position from the index/pinky knuckle midpoint and adjusts the arm to approach that target, keeping the lowest-error pose and rejecting corrections that move the wrist more than 70mm from its original target. `targets[].palm_anchor_fit` records target, before/after proxy error, attempts, and whether the correction was accepted. **This is a skeletal anchor, not a measured palm skin contact**; the pose is still unverified until proper skin surface and collision checks exist. Keep visual evaluation separate from CI smoke success.
