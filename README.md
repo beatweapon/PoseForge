@@ -94,3 +94,10 @@ py -m poseforge.cli render-present-card examples/human_card_present.json --blend
 Specify `pose.action="present_card"`, `hand="right"`, `presentation="chest_display"`, and the card `size` in meters. The card is placed using the rig's measured shoulder location and a fixed chest-forward offset. The old `grasp_card` action remains available as a comparison control.
 
 `report.json` now contains `presentation` and `arm_posture` (elbow height and rough elbow angle) alongside finger-tip and skin-sampling metrics. This is an **experimental placement preset**, not an anatomical posture solver: there is no joint-angle constraint or full mesh collision validation. A CI pass means the pipeline executed, not that the character holds the card convincingly.
+
+
+## Pinch pose-prior experiment (2026-11-03)
+
+The semantic `present_card` action uses `poseforge/pose_prior.py` to apply a conservative local joint-angle hand template before arm IK. It then allows at most three limited CCD correction iterations (0.04 radian per joint step) on thumb/index. This avoids prioritizing a tiny bone-tip error over the hand's shape. The older `grasp_card` is deliberately unchanged as a numerical baseline.
+
+`report.json > arm_reach.pose_prior` includes the template's joint angles, initial/final errors and whether the prior or bounded correction was selected. The pose-prior angles are only **experimental guesses** in MPFB local axes, not calibrated anatomy or verified joint limits; the rendered views must be inspected before treating them as a natural pinch.
