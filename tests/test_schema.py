@@ -77,6 +77,21 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.load(data)
 
+    def test_grasp_card_valid(self):
+        data = copy.deepcopy(SAMPLE)
+        data["pose"] = {"action": "grasp_card", "hand": "right",
+                        "card": {"position": [-0.47, -0.35, 0.87],
+                                 "size": [0.18, 0.006, 0.25]}}
+        self.assertEqual(self.load(data)["pose"]["action"], "grasp_card")
+
+    def test_grasp_card_invalid(self):
+        data = copy.deepcopy(SAMPLE)
+        data["pose"] = {"action": "grasp_card", "hand": "right",
+                        "card": {"position": [True, 0, 1],
+                                 "size": [0.18, 0.006, 0.25]}}
+        with self.assertRaises(ValueError):
+            self.load(data)
+
     def test_mpfb_fingers(self):
         bones = ["finger1-1.R", "finger2-3.L", "upperleg01.R", "wrist.R"]
         groups = classify_bones(bones)
