@@ -156,7 +156,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
 
     # Re-solve from a handle-relative palm target, rather than tuning a fixed
     # wrist offset. Preserve the earlier wrist pose when its original wrist
-    # target would be lost by more than 70mm.
+    # target would be lost by more than 25mm.
     palm_fits = {}
     for item in targets:
         side = item["hand"]
@@ -170,13 +170,13 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
         actual_wrist = rig.matrix_world @ wrist.head
         original_goal = Vector(item["grip_world"]) + Vector(item["wrist_offset"])
         wrist_deviation = (actual_wrist - original_goal).length
-        if wrist_deviation > 0.07:
+        if wrist_deviation > 0.025:
             for name in sorted(chain,
                                key=lambda n: len(bones[n].parent_recursive)):
                 bones[name].matrix = saved[name]
                 bpy.context.view_layer.update()
             fit["accepted"] = False
-            fit["rejection_reason"] = "wrist_original_goal_deviation_over_70mm"
+            fit["rejection_reason"] = "wrist_original_goal_deviation_over_25mm"
         else:
             fit["accepted"] = True
         fit["wrist_deviation_m"] = round(float(wrist_deviation), 6)
