@@ -102,6 +102,10 @@ def main():
             prior = (report.get("arm_reach") or {}).get("pose_prior", {})
             if prior.get("name") != "pinch_v1":
                 problems.append("missing pinch pose prior report")
+            if not errors or max(errors) > 0.03:
+                problems.append("semantic pinch exceeds 30mm bone-tip regression threshold")
+            if not posture.get("elbow_below_shoulder"):
+                problems.append("elbow should remain below shoulder")
             geometry_notes.append(
                 "- pose prior: " + str(prior.get("chosen"))
                 + ", tip errors=" + str(prior.get("final_errors_m")))
