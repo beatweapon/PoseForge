@@ -64,6 +64,15 @@ def main():
         if scene_name == "card_grasp" and report:
             if len(report.get("targets", [])) != 2 or not report.get("arm_reach"):
                 problems.append("grasp diagnostics missing")
+        if scene_name == "card_grasp" and report:
+            if not errors or max(errors) > 0.005:
+                problems.append("bone-tip grasp error exceeds 5 mm regression limit")
+            diagnostics = report.get("skin_contact_diagnostics") or {}
+            fingers = diagnostics.get("fingers", {})
+            for finger in ("thumb", "index"):
+                item = fingers.get(finger, {})
+                if not item.get("sample_count") or not item.get("nearest_skin_vertex"):
+                    problems.append(f"missing posed skin samples for {finger}")
         error_text = ", ".join(map(str, errors)) if errors else "—"
         if problems:
             failures.append(scene_name + ": " + "; ".join(problems))
