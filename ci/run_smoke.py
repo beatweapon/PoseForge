@@ -37,7 +37,9 @@ def main():
         config = json.loads((ROOT / "examples" / sample).read_text(encoding="utf-8"))
         config["model"]["source"] = str((ROOT / "assets" / "human.blend").resolve())
         config["output"] = str(OUT / scene_name)
-        config["cameras"] = ["front", "three_quarter", "hand_closeup"]
+        config["cameras"] = (["front", "back", "left", "right", "three_quarter", "hand_closeup"]
+                             if scene_name == "bow_hold"
+                             else ["front", "three_quarter", "hand_closeup"])
         config["render"].update(width=512, height=512)
         config_file = OUT / (scene_name + ".json")
         config_file.write_text(json.dumps(config, indent=2), encoding="utf-8")
@@ -125,6 +127,10 @@ def main():
                 problems.append("two hand targets required")
             if not prop.get("bow_string_shared_scene") or len(prop.get("bow_endpoints", [])) != 2:
                 problems.append("missing rigid bow/string prop geometry")
+            if prop.get("front_silhouette_end_rise_m", 0) < 0.1:
+                problems.append("bow silhouette lacks visible XZ curve")
+            if len(prop.get("parts", [])) != 2:
+                problems.append("missing limb/string geometry")
             if prop.get("length_m") != config["pose"]["length_m"]:
                 problems.append("bow length mismatch")
             if any(t.get("error_m", 99) > 0.10 for t in wrists):
