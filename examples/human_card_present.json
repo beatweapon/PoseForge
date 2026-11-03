@@ -1,0 +1,30 @@
+{
+  "model": {
+    "type": "mpfb",
+    "source": "../assets/human.blend"
+  },
+  "pose": {
+    "action": "present_card",
+    "hand": "right",
+    "presentation": "chest_display",
+    "size": [
+      0.18,
+      0.006,
+      0.25
+    ]
+  },
+  "cameras": [
+    "front",
+    "back",
+    "left",
+    "right",
+    "three_quarter",
+    "hand_closeup"
+  ],
+  "render": {
+    "width": 1024,
+    "height": 1024,
+    "transparent": true
+  },
+  "output": "../output/human_card_present"
+}
