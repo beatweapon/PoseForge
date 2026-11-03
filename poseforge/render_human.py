@@ -16,6 +16,7 @@ from grasp import solve_card_grasp, refine_skin_grasp, card_face_targets, _measu
 from contact import inspect_card_skin
 from presentation import resolve_card_presentation, measure_arm_posture
 from pose_prior import solve_card_with_prior
+from bow import hold_bow
 
 
 def look_at(cam, point):
@@ -71,6 +72,7 @@ def main():
     grasp_arm = None
     grasp_card = None
     presented_card = None
+    bow_prop = None
     if cfg["pose"]["action"] == "pinch_preview":
         preview_pose(rig)
     elif cfg["pose"]["action"] == "reach":
@@ -96,6 +98,8 @@ def main():
             rig, spec["hand"], spec["size"], spec["presentation"])
         grasp_card, grasp_arm, reach_results = solve_card_with_prior(
             rig, {"hand": spec["hand"], "card": presented_card})
+    elif cfg["pose"]["action"] == "hold_bow":
+        bow_prop, reach_results = hold_bow(rig, cfg["pose"])
     mesh_objs = [o for o in bpy.data.objects
                  if o.type == "MESH" and o.name not in ("Card_preview_NOT_contact_solved", "Card_grasp_preview")
                  and (o.parent == rig or any(m.type == "ARMATURE" and m.object == rig
@@ -131,6 +135,8 @@ def main():
         close_target = Vector(reach_results[0]["actual"])
     if grasp_card is not None:
         close_target = grasp_card.matrix_world.translation
+    if bow_prop is not None:
+        close_target = Vector(bow_prop["center"])
     if cfg["pose"]["action"] == "pinch_preview":
         card = bpy.data.objects.get("Card_preview_NOT_contact_solved")
         if card is not None:
@@ -186,7 +192,10 @@ def main():
         status = "grasp_preview_intersection_evidence"
     posture = (measure_arm_posture(rig, cfg["pose"]["hand"])
                if grasp_card is not None else None)
+    if bow_prop is not None:
+        status = "bilateral_bow_reference" if all(r["converged"] for r in reach_results) else "bilateral_bow_wrist_unconverged"
     report = {"status": status, "skin_quality": skin_quality,
+              "bow_prop": bow_prop,
               "arm_posture": posture, "presentation": presented_card,
               "targets": reach_results,
               "arm_reach": grasp_arm, "card": presented_card or cfg["pose"].get("card"),
