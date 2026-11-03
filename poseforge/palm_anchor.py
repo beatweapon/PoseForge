@@ -37,7 +37,8 @@ def resolve_palm_target(grip_world, handle_axis_world, approach_axis_world,
     return Vector(grip_world) - sideways * (radius + skin_allowance)
 
 
-def fit_palm_anchor(rig, side, target_world, *, passes=4):
+def fit_palm_anchor(rig, side, target_world, *, passes=5,
+                    wrist_goal_world=None, wrist_max_deviation=0.025):
     """Repeatedly solve arm position using the *actual* knuckle midpoint.
 
     Always retain the pose with the smallest palm-proxy error.
@@ -60,14 +61,18 @@ def fit_palm_anchor(rig, side, target_world, *, passes=4):
         if best_error < 0.008:
             break
         residual = target - palm_anchor(rig, side, names)
-        if residual.length > 0.06:
+        if residual.length > 0.012:
             residual.normalize()
-            residual *= 0.06
+            residual *= 0.012
         current_wrist = rig.matrix_world @ bones[wrist].head
         solve_hand_reach(rig, side, wrist, chain, current_wrist + residual)
         bpy.context.view_layer.update()
         candidate = error()
         trace.append(round(candidate, 6))
+        if wrist_goal_world is not None:
+            tested_wrist = rig.matrix_world @ bones[wrist].head
+            if (tested_wrist - Vector(wrist_goal_world)).length > wrist_max_deviation:
+                break
         if candidate < best_error - 0.0001:
             best_error = candidate
             best = {name: bones[name].matrix.copy() for name in chain}
