@@ -157,6 +157,12 @@ def main():
                     # The first 0.2-radian forward correction is allowed,
                     # but a large secondary regression must be investigated.
                     problems.append("palm-frame fit regressed substantially")
+                trials = grip.get("wrist_roll_trials") or []
+                if len(trials) != 7:
+                    problems.append("expected seven wrist-roll evaluations")
+                elif (after["forward_deg"] + 0.55 * after["plane_deg"] >
+                      min(t["objective_deg"] for t in trials) + 0.02):
+                    problems.append("wrist roll did not retain best candidate")
                 geometry_notes.append(
                     "- " + scene_name + " " + grip["hand"]
                     + " palm-plane angle "
