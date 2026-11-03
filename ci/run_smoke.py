@@ -18,6 +18,7 @@ SCENES = (
     ("human_card_pinch.json", "render-pinch", "pinch_preview"),
     ("human_card_grasp.json", "render-grasp-card", "card_grasp"),
     ("human_card_present.json", "render-present-card", "card_present"),
+    ("human_bow_hold.json", "render-hold-bow", "bow_hold"),
 )
 PNG_HEADER = b"\x89PNG\r\n\x1a\n"
 
@@ -117,6 +118,20 @@ def main():
                 + str(posture.get("elbow_below_shoulder"))
                 + ", elbow_angle_deg=" + str(posture.get("elbow_angle_deg"))
                 + ", bone-tip errors=" + str(errors))
+        if scene_name == "bow_hold" and report:
+            prop = report.get("bow_prop") or {}
+            wrists = report.get("targets", [])
+            if len(wrists) != 2 or {t.get("hand") for t in wrists} != {"right", "left"}:
+                problems.append("two hand targets required")
+            if not prop.get("bow_string_shared_scene") or len(prop.get("bow_endpoints", [])) != 2:
+                problems.append("missing rigid bow/string prop geometry")
+            if prop.get("length_m") != config["pose"]["length_m"]:
+                problems.append("bow length mismatch")
+            if any(t.get("error_m", 99) > 0.10 for t in wrists):
+                problems.append("wrist more than 100mm from bow grip seed")
+            geometry_notes.append(
+                "- bow hold: wrist-to-target errors=" + str(errors)
+                + "; rigid bow length=" + str(prop.get("length_m")))
         error_text = ", ".join(map(str, errors)) if errors else "—"
         if problems:
             failures.append(scene_name + ": " + "; ".join(problems))
