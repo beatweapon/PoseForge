@@ -74,3 +74,10 @@ py -m poseforge.cli render-hand-reach examples/human_hand_reach.json --blender "
 ## Two-finger card grasp preview (experimental)
 
 Run `py -m poseforge.cli render-grasp-card examples/human_card_grasp.json --blender BLENDER_PATH` to solve arm placement followed by thumb and index fingertip goals on opposite sides of the card. The `output/human_card_grasp/report.json` file includes `arm_reach` and `targets` with final world-space bone-tip errors. This is a **positional skeleton preview only**: it does not validate skin contact, anatomical joint limits, collision freedom, or whether the card can actually be held.
+
+
+## 検証の基準と前提の見直し（2026-11）
+
+指先の骨先端がカード目標点から3mm以内でも、見た目が自然にカードを保持しているとは限りません。実際にその問題が確認されたため、`grasp_card` のCIでは **骨先端の位置誤差（5mm超を回帰失敗とする）** に加え、MPFBの変形済みメッシュから指のウェイトに属する頂点を抽出し、カードの表面目標への距離とカード内に入ったサンプル頂点数を `skin_contact_diagnostics` に出力します。
+
+この頂点サンプリングは簡易診断であり、**接触面の完全な衝突判定ではありません**。指の自然な曲がり、指腹接触、手の向き、関節限界を今後の設計課題とします。数字だけを最適化せず、CIの複数視点画像を確認して進めます。
