@@ -8,6 +8,7 @@ import bpy
 from mathutils import Matrix, Vector
 from ik import solve_hand_reach
 from rig import arm_chain, wrist_bone_name, semantic_bones
+from grip_pose import apply_cylinder_grip
 
 
 def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
@@ -64,6 +65,15 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             "arm_ik": arm_result,
         })
 
+    # Hand templates are applied AFTER arm positioning, against the shared
+    # rigid handle frame. They do not move the prop or rewrite arm targets.
+    finger_priors = {}
+    for item in targets:
+        finger_priors[item["hand"]] = apply_cylinder_grip(
+            rig, item["hand"], item["grip_world"],
+            item.get("handle_axis_world", (1, 0, 0)),
+            radius=item.get("handle_radius_m", 0.016))
+
     # Sample after BOTH arms are solved; no stale first-hand measurements.
     for row in results:
         side = row["hand"]
@@ -85,5 +95,6 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             "orientation_step_limit_rad": max_orientation_rad,
             "hand_surface_contact_verified": False,
             "orientation_verified": False,
+            "finger_grip_prior": finger_priors[side],
         })
     return results
