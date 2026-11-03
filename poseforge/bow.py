@@ -34,16 +34,17 @@ def create_bow(center, length):
     points = []
     for i in range(33):
         u = -1.0 + 2.0 * i / 32
-        # Symmetric recurve-ish profile in XY; fixed in all camera views.
-        points.append(c + Vector((half * u, 0.11 * u * u - 0.035, 0)))
+        # The bow bends in the XZ plane, so the front/back renders show its
+        # silhouette rather than a straight horizontal rod.
+        points.append(c + Vector((half * u, 0.03 * u * u, 0.14 * u * u)))
     limbs = _tube("Bow_Limbs", points, 0.012, (0.38, 0.17, 0.065, 1))
     string = _tube("Bow_String",
-                   (points[0], c + Vector((0, -0.085, 0)), points[-1]),
+                   (points[0], c + Vector((0, -0.03, 0.14)), points[-1]),
                    0.0017, (0.85, 0.75, 0.55, 1))
     grip_offsets = {"right": -0.23 * length, "left": 0.23 * length}
     # Physical grip points lie on the curved rigid limb.
     grip_points = {
-        side: c + Vector((x, 0.11 * (x / half) ** 2 - 0.035, 0))
+        side: c + Vector((x, 0.03 * (x / half) ** 2, 0.14 * (x / half) ** 2))
         for side, x in grip_offsets.items()
     }
     return {
@@ -53,6 +54,7 @@ def create_bow(center, length):
         "grips": {k: [float(v) for v in p] for k, p in grip_points.items()},
         "bow_endpoints": [[float(v) for v in p] for p in (points[0], points[-1])],
         "bow_string_shared_scene": True,
+        "front_silhouette_end_rise_m": 0.14,
     }
 
 
@@ -70,7 +72,7 @@ def hold_bow(rig, specification):
         grip = Vector(prop["grips"][side])
         # The wrist joint is intentionally just below and behind the bow;
         # it is not identical to palm or skin contact.
-        goal = grip + Vector((0, 0.035, -0.035))
+        goal = grip + Vector((0, 0.012, 0.078))
         wrist = wrist_bone_name(side)
         res = solve_hand_reach(
             rig, side, wrist, arm_chain(side, bones.keys()), goal)
