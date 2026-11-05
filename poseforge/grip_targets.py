@@ -4,6 +4,7 @@ Targets specify a position and approach direction in WORLD coordinates.
 Wrist-to-knuckle is only a coarse hand-axis proxy, not a grip/contact test.
 """
 import math
+import os
 import bpy
 from mathutils import Matrix, Quaternion, Vector
 from ik import solve_hand_reach
@@ -49,6 +50,9 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
                "approach_axis_world": xyz}].
     The direction is interpreted as wrist->knuckles, in WORLD coordinates.
     """
+    variant = os.environ.get("POSEFORGE_GRIP_VARIANT", "current")
+    if variant not in ("current", "no_anchor", "no_roll", "no_finger_prior"):
+        raise ValueError("Unknown POSEFORGE_GRIP_VARIANT: " + variant)
     bones = rig.pose.bones
     mapping = semantic_bones(bones.keys())
     results = []
@@ -119,8 +123,8 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
                                  **values})
             # Wider exploration than the original ±0.16-rad single step.
             # Maximum total wrist roll is 0.48 rad (~27.5 degrees).
-            for rotation_angle in (-0.48, -0.32, -0.16,
-                                    0.16, 0.32, 0.48):
+            for rotation_angle in (() if variant == "no_roll" else
+                                   (-0.48, -0.32, -0.16, 0.16, 0.32, 0.48)):
                 wrist.matrix = base.copy()
                 bpy.context.view_layer.update()
                 rotation = Quaternion(forward_axis, rotation_angle)
@@ -167,7 +171,14 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             item["grip_world"], item.get("handle_axis_world", (1, 0, 0)),
             item["approach_axis_world"], item.get("handle_radius_m", 0.016))
         original_goal = Vector(item["grip_world"]) + Vector(item["wrist_offset"])
-        fit = fit_palm_anchor(rig, side, goal, wrist_goal_world=original_goal)
+        fit = (fit_palm_anchor(rig, side, goal, wrist_goal_world=original_goal)
+               if variant != "no_anchor" else {
+                   "name": "skeletal_palm_anchor_v1",
+                   "initial_error_m": round((palm_anchor(rig, side) - goal).length, 6),
+                   "final_error_m": round((palm_anchor(rig, side) - goal).length, 6),
+                   "improved_or_unchanged": True,
+                   "attempted_errors_m": [], "skin_contact_verified": False,
+               })
         actual_wrist = rig.matrix_world @ wrist.head
         wrist_deviation = (actual_wrist - original_goal).length
         if wrist_deviation > 0.025:
@@ -197,10 +208,11 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
     # rigid handle frame. They do not move the prop or rewrite arm targets.
     finger_priors = {}
     for item in targets:
-        finger_priors[item["hand"]] = apply_cylinder_grip(
+        finger_priors[item["hand"]] = (apply_cylinder_grip(
             rig, item["hand"], item["grip_world"],
             item.get("handle_axis_world", (1, 0, 0)),
             radius=item.get("handle_radius_m", 0.016))
+            if variant != "no_finger_prior" else None)
 
     # Sample after BOTH arms are solved; no stale first-hand measurements.
     for row in results:
@@ -224,6 +236,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             "hand_surface_contact_verified": False,
             "orientation_verified": False,
             "finger_grip_prior": finger_priors[side],
+            "experiment_variant": variant,
             "palm_anchor_fit": palm_fits[side],
             "pose_quality": {
                 "status": "unverified",
@@ -232,6 +245,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
                     palm_after["plane_deg"] is not None and
                     palm_after["plane_deg"] <= 25.0),
                 "index_bone_axis_gap_within_target": (
+                    finger_priors[side] is not None and
                     abs(finger_priors[side]["final_axis_distances_m"]["index"] -
                         finger_priors[side]["radius_m"]) <= 0.025),
                 "skin_contact_verified": False,
