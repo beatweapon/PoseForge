@@ -123,3 +123,20 @@ The shared prop solver now estimates a hand plane from the wrist, index knuckle,
 ## Handle-first palm anchor experiment
 
 The shared bow/staff grip solver now derives a **skeletal palm target** from the rigid handle axis, grip center, handle radius, and the desired hand approach direction. It estimates the palm position from the index/pinky knuckle midpoint and adjusts the arm to approach that target, keeping the lowest-error pose and rejecting corrections that move the wrist more than 25mm from its original target. `targets[].palm_anchor_fit` records target, before/after proxy error, attempts, and whether the correction was accepted. **This is a skeletal anchor, not a measured palm skin contact**; the pose is still unverified until proper skin surface and collision checks exist. Keep visual evaluation separate from CI smoke success.
+
+
+## One-run multi-candidate pose iteration
+
+GitHub Actions now runs `ci/run_pose_batch.py` after ordinary smoke tests.
+It reuses the same MPFB-generated `assets/human.blend` and compares four
+independent bow variants (`current`, `no_anchor`, `no_roll`,
+`no_finger_prior`) in one CI run. Each variant is spawned in its own
+Blender process with `POSEFORGE_GRIP_VARIANT` and the same camera/prop dimensions.
+The batch produces `output/ci/bow_batch/comparison.png`,
+`comparison.json`, `summary.md`, and per-variant full render reports.
+
+**No auto-promotion:** numerical proxy improvements do not prove a natural
+grip; `selected=null` until multi-view images are reviewed. When performing
+future experiments, change the tested hypotheses as a group and run one batch,
+rather than pushing every tiny parameter adjustment. Experimental variants
+must never change the default `current` output unless deliberately accepted.
