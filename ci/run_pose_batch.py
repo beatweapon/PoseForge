@@ -27,7 +27,7 @@ def summarize(report):
         return float(value) if value is not None else None
     return {
         "max_wrist_error_m": max(float(h["error_m"]) for h in hands),
-        "mean_palm_error_m": mean([hand_metric(h, "palm_anchor_fit", "final_error_m") for h in hands]),
+        "mean_palm_error_m": mean([float(h["joint_grip_fit"]["final"]["palm_error_m"])\n                                    if h.get("joint_grip_fit") else\n                                    hand_metric(h, "palm_anchor_fit", "final_error_m")\n                                    for h in hands]),
         "mean_palm_plane_deg": mean([float(h["palm_frame_final"]["plane_deg"]) for h in hands]),
         "mean_index_axis_gap_m": (
             mean([float(h["finger_grip_prior"]["final_axis_distances_m"]["index"])
@@ -120,7 +120,9 @@ def main():
         headings.append(f'| {r["variant"]} | {r["max_wrist_error_m"]*1000:.1f} | '
                         f'{r["mean_palm_error_m"]*1000:.1f} | '
                         f'{r["mean_palm_plane_deg"]:.1f} | {gap} |')
-    headings += ["", "See comparison.png and each variant's report.json.",
+    headings += ["", "Values come from the final posed bones, including any accepted coupled adjustment.",
+                 "No natural-grip acceptance without visual and skin-contact evidence.",
+                 "See comparison.png and each variant's report.json.",
                  "All contact and collision claims remain unverified.", ""]
     (folder / "summary.md").write_text("\n".join(headings))
     print("\n".join(headings))
