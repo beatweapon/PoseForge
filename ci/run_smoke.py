@@ -148,7 +148,13 @@ def main():
                     entry = skin[side]
                     geometry_notes.append(
                         f"- {scene_name}/{side}: skin samples={entry['sample_count']}, "
-                        f"penetration evidence={entry['has_penetration_evidence']}")
+                        f"penetration evidence={entry['has_penetration_evidence']}; "
+                        + "; ".join(
+                            f"{finger}: groups={len(item['matched_vertex_groups'])}, "
+                            f"weighted={item['weighted_vertex_count']}, "
+                            f"axial={item['axial_window_vertex_count']}, "
+                            f"closest_gap={item['closest_signed_gap_in_axial_window_m']}"
+                            for finger, item in entry["fingers"].items()))
             wrists = report.get("targets", [])
             if len(wrists) != 2:
                 problems.append("two wrist grips required")
