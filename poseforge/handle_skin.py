@@ -5,7 +5,7 @@ collision-freedom or a stable physical grasp.
 """
 import bpy
 from mathutils import Vector
-from rig import mpfb_skin_groups
+from rig import mpfb_skin_groups, semantic_bones
 
 FINGERS = ("thumb", "index", "middle", "ring", "pinky")
 
@@ -21,6 +21,7 @@ def cylinder_gap(point, center, axis, radius):
 def inspect_handle_skin(rig, targets, body_meshes):
     bpy.context.view_layer.update()
     graph = bpy.context.evaluated_depsgraph_get()
+    bone_names = semantic_bones(rig.pose.bones.keys())
     result = {"method": "evaluated_weighted_finger_vertices",
               "exact_collision_verified": False, "contact_verified": False,
               "hands": {}}
@@ -33,11 +34,14 @@ def inspect_handle_skin(rig, targets, body_meshes):
             raise ValueError("Invalid handle")
         axis.normalize()
         hand = {"fingers": {}, "skipped_topology": []}
+        tips = {f: rig.matrix_world @ rig.pose.bones[bone_names[f"{side}_{f}_3"]].tail
+                for f in FINGERS}
         for finger in FINGERS:
             gaps = []
             all_gaps = []
             weighted_count = 0
             matched_groups = set()
+            selection_method = "vertex_weights"
             for obj in body_meshes:
                 groups = {obj.vertex_groups[name].index
                           for name in mpfb_skin_groups(side, finger)
@@ -66,7 +70,33 @@ def inspect_handle_skin(rig, targets, body_meshes):
                                 gaps.append(gap)
                 finally:
                     evaluated.to_mesh_clear()
+            if weighted_count == 0:
+                # MPFB can expose group names without assigned weights.
+                # Approximate segmentation by proximity to distal bone tips.
+                selection_method = "distal_tip_voronoi_35mm"
+                own = tips[finger]
+                for obj in body_meshes:
+                    evaluated = obj.evaluated_get(graph)
+                    mesh = evaluated.to_mesh()
+                    try:
+                        for vert in mesh.vertices:
+                            point = evaluated.matrix_world @ vert.co
+                            distance = (point - own).length
+                            if distance > 0.035:
+                                continue
+                            if any((point - tip).length < distance
+                                   for key, tip in tips.items() if key != finger):
+                                continue
+                            weighted_count += 1
+                            gap, axial = cylinder_gap(point, center, axis, radius)
+                            if abs(axial) <= 0.10:
+                                all_gaps.append(gap)
+                                if gap <= 0.055:
+                                    gaps.append(gap)
+                    finally:
+                        evaluated.to_mesh_clear()
             hand["fingers"][finger] = {
+                "selection_method": selection_method,
                 "sample_count": len(gaps),
                 "weighted_vertex_count": weighted_count,
                 "axial_window_vertex_count": len(all_gaps),
