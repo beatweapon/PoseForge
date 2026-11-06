@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 from grip_quality import score_skin_samples, compare_skin_candidates
 
 ROOT = Path(__file__).resolve().parent.parent
-VARIANTS = ("current", "skin_tight", "skin_joint", "skin_feedback")
+VARIANTS = ("current", "skin_joint", "skin_feedback", "skin_opposition")
 VIEWS = ("front", "back", "three_quarter", "hand_closeup")
 
 
@@ -95,8 +95,8 @@ def main():
             raise RuntimeError(f"{variant}: variant configuration was ignored")
         row = {"variant": variant, **summarize(report)}
         row["skin_quality"] = score_skin_samples(report.get("handle_skin_diagnostics"))
-        scales = {"current": 1.0, "skin_tight": 1.50,
-                  "skin_joint": 1.50, "skin_feedback": 1.50}
+        scales = {"current": 1.0, "skin_joint": 1.50,
+                  "skin_feedback": 1.50, "skin_opposition": 1.50}
         actual_scales = {
             h.get("finger_grip_prior", {}).get("curl_scale")
             for h in report.get("targets", [])
@@ -104,7 +104,7 @@ def main():
         if actual_scales != {scales[variant]}:
             raise RuntimeError(f"{variant}: curl scale ignored: {actual_scales}")
         row["curl_scale"] = scales[variant]
-        if variant == "skin_feedback":
+        if variant in ("skin_feedback", "skin_opposition"):
             feedback = [h.get("skin_feedback") for h in report.get("targets", [])]
             if len(feedback) != 2 or any(
                     not f or len(f["trials"]) != 5
@@ -113,7 +113,7 @@ def main():
                     for f in feedback):
                 raise RuntimeError("Skin-feedback constraints or reports missing")
             row["skin_feedback"] = feedback
-        if variant in ("skin_joint", "skin_feedback"):
+        if variant in ("skin_joint", "skin_feedback", "skin_opposition"):
             fits = row["joint_fits"]
             if len(fits) != 2 or any(
                 fit is None or not fit["objective_non_regression"]
@@ -122,12 +122,18 @@ def main():
                 raise RuntimeError("Joint skin candidate missing constrained fit")
         if set((row["sampled_skin"] or {}).get("hands", {})) != {"left", "right"}:
             raise RuntimeError(f"{variant}: missing handle skin diagnostics")
+        radial = (row["sampled_skin"] or {})["hands"]
+        row["opposing_hands"] = sum(
+            bool(radial[side].get("opposing_sides_proxy")) for side in ("left", "right"))
+        row["thumb_index_dot"] = {
+            side: radial[side].get("thumb_index_radial_dot")
+            for side in ("left", "right")}
         rows.append(row)
     draw_montage(folder, rows)
     if not (folder / "comparison.png").is_file():
         raise RuntimeError("Montage generation failed")
     payload = {
-        "experiment": "bow actual skin guided wrist refinement v5",
+        "experiment": "bow thumb/index opposing side probe v6",
         "reference": "current",
         "variants": rows,
         "selected": None,
@@ -139,18 +145,18 @@ def main():
     (folder / "comparison.json").write_text(json.dumps(payload, indent=2) + "\n")
     headings = [
         "# Bow finger skin/handle batch comparison", "",
-        "Four isolated curl strengths using an identical rigid prop and cameras.",
+        "Four independent grip methods using identical rigid prop and cameras.",
         "Sampled mesh proximity and penetration are diagnostics, not contact proof.",
         "",
-        "| Variant | Curl scale | Wrist max (mm) | Palm mean (mm) | Skin score ↓ | Close fingers / 4 | Deep inside vertices |",
-        "|---|---:|---:|---:|---:|---:|---:|",
+        "| Variant | Curl scale | Wrist max (mm) | Palm mean (mm) | Skin score ↓ | Close fingers / 4 | Deep inside vertices | Opposing hands / 2 |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         q = row["skin_quality"]
         headings.append(
             f'| {row["variant"]} | {row["curl_scale"]:.2f} | {row["max_wrist_error_m"]*1000:.1f} | '
             f'{row["mean_palm_error_m"]*1000:.1f} | {q["score"]:.1f} | '
-            f'{q["near_surface_fingers"]}/4 | {q["penetrating_vertices"]} |'
+            f'{q["near_surface_fingers"]}/4 | {q["penetrating_vertices"]} | {row["opposing_hands"]}/2 |'
         )
     proxy_leader = compare_skin_candidates(rows)
     headings += [
