@@ -18,6 +18,7 @@ from presentation import resolve_card_presentation, measure_arm_posture
 from pose_prior import solve_card_with_prior
 from bow import hold_bow
 from staff import hold_staff
+from handle_skin import inspect_handle_skin
 
 
 def look_at(cam, point):
@@ -125,6 +126,8 @@ def main():
             row["sample_point"] = "bone_tail"
         skin_contact = inspect_card_skin(
             rig, grasp_card, side, mapping, mesh_objs)
+    handle_skin = (inspect_handle_skin(rig, bow_prop["grip_frames"], mesh_objs)
+                   if bow_prop is not None else None)
     points = [o.matrix_world @ Vector(corner) for o in mesh_objs for corner in o.bound_box]
     low = Vector((min(p[i] for p in points) for i in range(3)))
     high = Vector((max(p[i] for p in points) for i in range(3)))
@@ -199,6 +202,7 @@ def main():
         status = "bilateral_prop_reference" if all(r["converged"] for r in reach_results) else "bilateral_prop_wrist_unconverged"
     report = {"status": status, "skin_quality": skin_quality,
               "bow_prop": bow_prop,
+              "handle_skin_diagnostics": handle_skin,
               "arm_posture": posture, "presentation": presented_card,
               "targets": reach_results,
               "arm_reach": grasp_arm, "card": presented_card or cfg["pose"].get("card"),
