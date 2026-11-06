@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 from grip_quality import score_skin_samples, compare_skin_candidates
 
 ROOT = Path(__file__).resolve().parent.parent
-VARIANTS = ("current", "skin_loose", "skin_firm", "skin_tight")
+VARIANTS = ("current", "skin_loose", "skin_tight", "skin_joint")
 VIEWS = ("front", "back", "three_quarter", "hand_closeup")
 
 
@@ -96,7 +96,7 @@ def main():
         row = {"variant": variant, **summarize(report)}
         row["skin_quality"] = score_skin_samples(report.get("handle_skin_diagnostics"))
         scales = {"current": 1.0, "skin_loose": 0.70,
-                  "skin_firm": 1.20, "skin_tight": 1.50}
+                  "skin_tight": 1.50, "skin_joint": 1.50}
         actual_scales = {
             h.get("finger_grip_prior", {}).get("curl_scale")
             for h in report.get("targets", [])
@@ -104,6 +104,13 @@ def main():
         if actual_scales != {scales[variant]}:
             raise RuntimeError(f"{variant}: curl scale ignored: {actual_scales}")
         row["curl_scale"] = scales[variant]
+        if variant == "skin_joint":
+            fits = row["joint_fits"]
+            if len(fits) != 2 or any(
+                fit is None or not fit["objective_non_regression"]
+                or len(fit["trials"]) != 13 for fit in fits
+            ):
+                raise RuntimeError("Joint skin candidate missing constrained fit")
         if set((row["sampled_skin"] or {}).get("hands", {})) != {"left", "right"}:
             raise RuntimeError(f"{variant}: missing handle skin diagnostics")
         rows.append(row)
@@ -111,7 +118,7 @@ def main():
     if not (folder / "comparison.png").is_file():
         raise RuntimeError("Montage generation failed")
     payload = {
-        "experiment": "bow skin-based finger curl comparison v3",
+        "experiment": "bow skin/arm combined candidate comparison v4",
         "reference": "current",
         "variants": rows,
         "selected": None,
