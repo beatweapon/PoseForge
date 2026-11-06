@@ -167,3 +167,18 @@ the second batch replaces the `joint_contact` weighting-only variant with
 orientation* and rolls back if the coupled objective or wrist budget worsens.
 The summary now uses `palm_frame_final`, not the intermediate palm plane
 captured before the last pose operation. No grip is automatically promoted.
+
+
+### Evaluated hand-to-handle geometry
+
+`poseforge/handle_skin.py` now samples deformed character vertices around
+each prop grip. MPFB may provide nominal finger vertex groups with **no
+assigned weights**; in that case, it explicitly falls back to a 35mm
+nearest-distal-bone/Voronoi skin approximation. For every finger, the JSON
+records `selection_method`, candidate count, signed cylinder-surface gap,
+sampled points within 5mm, and sampled points more than 2mm inside the
+cylinder. These results are **diagnostic evidence only**, not rigorous
+continuous collision testing or proof of a stable grasp.
+
+The smoke CI requires nonempty evaluated hand skin samples for bow and staff;
+previously it permitted the diagnostic to silently report zero vertices.

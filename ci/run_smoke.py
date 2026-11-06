@@ -146,6 +146,8 @@ def main():
             else:
                 for side in ("left", "right"):
                     entry = skin[side]
+                    if entry["sample_count"] == 0:
+                        problems.append(f"{side} evaluated finger skin samples missing")
                     geometry_notes.append(
                         f"- {scene_name}/{side}: skin samples={entry['sample_count']}, "
                         f"penetration evidence={entry['has_penetration_evidence']}; "
