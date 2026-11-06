@@ -52,7 +52,8 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
     The direction is interpreted as wrist->knuckles, in WORLD coordinates.
     """
     variant = os.environ.get("POSEFORGE_GRIP_VARIANT", "current")
-    if variant not in ("current", "no_anchor", "no_roll", "no_finger_prior", *WEIGHTS):
+    experimental_scales = {"skin_loose": 0.70, "skin_firm": 1.20, "skin_tight": 1.50}
+    if variant not in ("current", "no_anchor", "no_roll", "no_finger_prior", *WEIGHTS, *experimental_scales):
         raise ValueError("Unknown POSEFORGE_GRIP_VARIANT: " + variant)
     bones = rig.pose.bones
     mapping = semantic_bones(bones.keys())
@@ -219,7 +220,8 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
         finger_priors[item["hand"]] = (apply_cylinder_grip(
             rig, item["hand"], item["grip_world"],
             item.get("handle_axis_world", (1, 0, 0)),
-            radius=item.get("handle_radius_m", 0.016))
+            radius=item.get("handle_radius_m", 0.016),
+            curl_scale=experimental_scales.get(variant, 1.0))
             if variant != "no_finger_prior" else None)
 
     # Sample after BOTH arms are solved; no stale first-hand measurements.
