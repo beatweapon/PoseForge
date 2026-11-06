@@ -54,7 +54,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
     """
     variant = os.environ.get("POSEFORGE_GRIP_VARIANT", "current")
     experimental_scales = {"skin_loose": 0.70, "skin_firm": 1.20, "skin_tight": 1.50, "skin_joint": 1.50,
-                           "skin_feedback": 1.50}
+                           "skin_feedback": 1.50, "skin_opposition": 1.50}
     if variant not in ("current", "no_anchor", "no_roll", "no_finger_prior", *WEIGHTS, *experimental_scales):
         raise ValueError("Unknown POSEFORGE_GRIP_VARIANT: " + variant)
     bones = rig.pose.bones
@@ -211,7 +211,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
     # New experimental path: couple the palm-anchor error, orientation and
     # wrist deviation into one candidate score. Default behaviour is unchanged.
     joint_fits = {}
-    if variant in WEIGHTS or variant in ("skin_joint", "skin_feedback"):
+    if variant in WEIGHTS or variant in ("skin_joint", "skin_feedback", "skin_opposition"):
         for item in targets:
             joint_fits[item["hand"]] = refine_joint_grip(
                 rig, item, "joint_position" if variant in ("skin_joint", "skin_feedback") else variant)
@@ -228,7 +228,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             if variant != "no_finger_prior" else None)
 
     skin_feedback = {}
-    if variant == "skin_feedback":
+    if variant in ("skin_feedback", "skin_opposition"):
         body_meshes = [
             obj for obj in bpy.data.objects if obj.type == "MESH"
             and (obj.parent == rig or any(
@@ -239,7 +239,8 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             raise RuntimeError("No skinned body mesh for skin feedback")
         for item in targets:
             skin_feedback[item["hand"]] = refine_skin_wrist(
-                rig, item, body_meshes)
+                rig, item, body_meshes,
+                require_opposition=(variant == "skin_opposition"))
 
     # Sample after BOTH arms are solved; no stale first-hand measurements.
     for row in results:
