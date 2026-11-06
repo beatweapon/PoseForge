@@ -104,8 +104,7 @@ def main():
         "requires_visual_review": True,
         "views": list(VIEWS),
     }
-    (folder / "comparison.json").write_text(json.dumps(payload, indent=2) + "
-")
+    (folder / "comparison.json").write_text(json.dumps(payload, indent=2) + "\n")
     headings = ["# Bow grip batch comparison", "",
                 "All candidates were independently rendered from the same model and scene.",
                 "No automatic winner: human/vision inspection is required.", "",
@@ -128,10 +127,8 @@ def main():
                  "No natural-grip acceptance without visual and skin-contact evidence.",
                  "See comparison.png and each variant's report.json.",
                  "All contact and collision claims remain unverified.", ""]
-    (folder / "summary.md").write_text("
-".join(headings))
-    print("
-".join(headings))
+    (folder / "summary.md").write_text("\n".join(headings))
+    print("\n".join(headings))
 
 
 if __name__ == "__main__":
