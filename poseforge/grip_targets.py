@@ -214,7 +214,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
     if variant in WEIGHTS or variant in ("skin_joint", "skin_feedback", "skin_opposition"):
         for item in targets:
             joint_fits[item["hand"]] = refine_joint_grip(
-                rig, item, "joint_position" if variant in ("skin_joint", "skin_feedback") else variant)
+                rig, item, "joint_position" if variant in ("skin_joint", "skin_feedback", "skin_opposition") else variant)
 
     # Hand templates are applied AFTER arm positioning, against the shared
     # rigid handle frame. They do not move the prop or rewrite arm targets.
