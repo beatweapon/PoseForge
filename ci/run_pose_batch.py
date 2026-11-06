@@ -9,9 +9,10 @@ import subprocess
 import sys
 from pathlib import Path
 from PIL import Image, ImageDraw
+from grip_quality import score_skin_samples, compare_skin_candidates
 
 ROOT = Path(__file__).resolve().parent.parent
-VARIANTS = ("current", "joint_balanced", "joint_position", "joint_orientation")
+VARIANTS = ("current", "skin_loose", "skin_firm", "skin_tight")
 VIEWS = ("front", "back", "three_quarter", "hand_closeup")
 
 
@@ -93,6 +94,7 @@ def main():
         if {h.get("experiment_variant") for h in report.get("targets", [])} != {variant}:
             raise RuntimeError(f"{variant}: variant configuration was ignored")
         row = {"variant": variant, **summarize(report)}
+        row["skin_quality"] = score_skin_samples(report.get("handle_skin_diagnostics"))
         if set((row["sampled_skin"] or {}).get("hands", {})) != {"left", "right"}:
             raise RuntimeError(f"{variant}: missing handle skin diagnostics")
         rows.append(row)
@@ -100,37 +102,38 @@ def main():
     if not (folder / "comparison.png").is_file():
         raise RuntimeError("Montage generation failed")
     payload = {
-        "experiment": "bow coupled-grip proxy comparison v2",
+        "experiment": "bow skin-based finger curl comparison v3",
         "reference": "current",
         "variants": rows,
         "selected": None,
-        "selection_reason": "No automatic promotion: score is a skeletal proxy, not a validated grasp.",
+        "proxy_leader": compare_skin_candidates(rows),
+        "selection_reason": "No automatic promotion: mesh vertex proximity is not proof of a natural grasp.",
         "requires_visual_review": True,
         "views": list(VIEWS),
     }
     (folder / "comparison.json").write_text(json.dumps(payload, indent=2) + "\n")
-    headings = ["# Bow grip batch comparison", "",
-                "All candidates were independently rendered from the same model and scene.",
-                "No automatic winner: human/vision inspection is required.", "",
-                "| Variant | Wrist max (mm) | Palm mean (mm) | Plane mean (deg) | Index axis mean (mm) |",
-                "|---|---:|---:|---:|---:|"]
-    for r in rows:
-        if r["variant"].startswith("joint_"):
-            fits = r["joint_fits"]
-            if len(fits) != 2 or any(not fit["objective_non_regression"]
-                                      or len(fit["trials"]) != 13 for fit in fits):
-                raise RuntimeError("Incomplete or regressing coupled search")
-            if r["variant"] == "joint_position" and not all(
-                    fit["arm_position_refinement"]["attempted"] for fit in fits):
-                raise RuntimeError("Joint position refinement was not attempted")
-        gap = "n/a" if r["mean_index_axis_gap_m"] is None else f'{r["mean_index_axis_gap_m"]*1000:.1f}'
-        headings.append(f'| {r["variant"]} | {r["max_wrist_error_m"]*1000:.1f} | '
-                        f'{r["mean_palm_error_m"]*1000:.1f} | '
-                        f'{r["mean_palm_plane_deg"]:.1f} | {gap} |')
-    headings += ["", "Values come from the final posed bones, including any accepted coupled adjustment.",
-                 "No natural-grip acceptance without visual and skin-contact evidence.",
-                 "See comparison.png and each variant's report.json.",
-                 "All contact and collision claims remain unverified.", ""]
+    headings = [
+        "# Bow finger skin/handle batch comparison", "",
+        "Four isolated curl strengths using an identical rigid prop and cameras.",
+        "Sampled mesh proximity and penetration are diagnostics, not contact proof.",
+        "",
+        "| Variant | Wrist max (mm) | Palm mean (mm) | Skin score ↓ | Close fingers / 4 | Deep inside vertices |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for row in rows:
+        q = row["skin_quality"]
+        headings.append(
+            f'| {row["variant"]} | {row["max_wrist_error_m"]*1000:.1f} | '
+            f'{row["mean_palm_error_m"]*1000:.1f} | {q["score"]:.1f} | '
+            f'{q["near_surface_fingers"]}/4 | {q["penetrating_vertices"]} |'
+        )
+    proxy_leader = compare_skin_candidates(rows)
+    headings += [
+        "", "Lowest sampled proxy score: " + str(proxy_leader),
+        "The score is NOT evidence of continuous surface contact, joint compliance, or correct grip.",
+        "No candidate is automatically promoted to the default solver.",
+        "See comparison.png, comparison.json and each variant's report.json.", "",
+    ]
     (folder / "summary.md").write_text("\n".join(headings))
     print("\n".join(headings))
 
