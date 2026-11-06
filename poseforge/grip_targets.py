@@ -11,6 +11,7 @@ from ik import solve_hand_reach
 from rig import arm_chain, wrist_bone_name, semantic_bones
 from grip_pose import apply_cylinder_grip
 from palm_anchor import resolve_palm_target, fit_palm_anchor, palm_anchor
+from joint_fit import refine_joint_grip, WEIGHTS
 
 
 def _hand_frame(bones, names, side):
@@ -51,7 +52,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
     The direction is interpreted as wrist->knuckles, in WORLD coordinates.
     """
     variant = os.environ.get("POSEFORGE_GRIP_VARIANT", "current")
-    if variant not in ("current", "no_anchor", "no_roll", "no_finger_prior"):
+    if variant not in ("current", "no_anchor", "no_roll", "no_finger_prior", *WEIGHTS):
         raise ValueError("Unknown POSEFORGE_GRIP_VARIANT: " + variant)
     bones = rig.pose.bones
     mapping = semantic_bones(bones.keys())
@@ -204,6 +205,13 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             accepted_gap <= fit["initial_error_m"] + 1e-5)
         palm_fits[side] = fit
 
+    # New experimental path: couple the palm-anchor error, orientation and
+    # wrist deviation into one candidate score. Default behaviour is unchanged.
+    joint_fits = {}
+    if variant in WEIGHTS:
+        for item in targets:
+            joint_fits[item["hand"]] = refine_joint_grip(rig, item, variant)
+
     # Hand templates are applied AFTER arm positioning, against the shared
     # rigid handle frame. They do not move the prop or rewrite arm targets.
     finger_priors = {}
@@ -225,11 +233,20 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             row["approach_axis_world"])
         angle = (math.degrees(axis.angle(desired_local))
                  if axis.length > 1e-8 else None)
+        # Report each hand from FINAL bone matrices. In the previous prototype
+        # palm_after was captured before subsequent palm adjustment, so it
+        # could disagree with the rendered final pose.
+        desired_normal = (rig.matrix_world.inverted().to_3x3() @
+                          Vector(targets[[t["hand"] for t in targets].index(side)]
+                                 .get("palm_normal_world", (0, -1, 0)))).normalized()
+        actual_palm = _palm_metrics(bones, mapping, side,
+                                    desired_local.normalized(), desired_normal)
         row.update({
             "target": row["wrist_goal_world"],
             "actual": [float(v) for v in actual],
             "error_m": round((actual - goal).length, 6),
             "converged": (actual - goal).length <= 0.01,
+            "palm_frame_final": actual_palm,
             "orientation_angle_after_deg": (
                 round(angle, 3) if angle is not None else None),
             "orientation_step_limit_rad": max_orientation_rad,
@@ -238,6 +255,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             "finger_grip_prior": finger_priors[side],
             "experiment_variant": variant,
             "palm_anchor_fit": palm_fits[side],
+            "joint_grip_fit": joint_fits.get(side),
             "pose_quality": {
                 "status": "unverified",
                 "criteria": "palm plane <= 25deg; index tip axis gap <= 25mm",

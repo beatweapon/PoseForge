@@ -71,7 +71,7 @@ jobs:
       - name: Install montage support
         run: python -m pip install "Pillow>=10,<13"
 
-      - name: Batch compare four bow grip variants
+      - name: Batch compare coupled bow grip candidates
         run: python ci/run_pose_batch.py --blender "$BLENDER_BINARY"
 
       - name: Add summary to workflow

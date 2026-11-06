@@ -140,3 +140,20 @@ grip; `selected=null` until multi-view images are reviewed. When performing
 future experiments, change the tested hypotheses as a group and run one batch,
 rather than pushing every tiny parameter adjustment. Experimental variants
 must never change the default `current` output unless deliberately accepted.
+
+
+## Coupled grip experiment (batch v2)
+
+The next batch runs `current`, `joint_balanced`, `joint_contact`, and
+`joint_orientation` as isolated Blender processes. The experimental solver
+`poseforge/joint_fit.py` jointly scores a **skeletal palm** target, its
+orientation, and wrist position. All candidate wrist rotations are evaluated
+from the same parent-pose baseline, with a 25mm wrist deviation guard.
+`targets[].joint_grip_fit` includes candidate scores and rollback evidence.
+`targets[].palm_frame_final` is measured after all pose modifications, unlike
+the older intermediate `palm_frame_after` field.
+
+Comparison artifacts are emitted automatically. None of these metrics
+establishes skin contact, collision freedom, or anatomical joint-limit
+compliance. The current solution remains the production default unless a
+visual review justifies a change.
