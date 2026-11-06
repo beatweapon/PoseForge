@@ -34,6 +34,7 @@ def inspect_handle_skin(rig, targets, body_meshes):
             raise ValueError("Invalid handle")
         axis.normalize()
         hand = {"fingers": {}, "skipped_topology": []}
+        hand_nearest = {}
         tips = {f: rig.matrix_world @ rig.pose.bones[bone_names[f"{side}_{f}_3"]].tail
                 for f in FINGERS}
         for finger in FINGERS:
@@ -42,6 +43,7 @@ def inspect_handle_skin(rig, targets, body_meshes):
             weighted_count = 0
             matched_groups = set()
             selection_method = "vertex_weights"
+            nearest_vertex = None
             for obj in body_meshes:
                 groups = {obj.vertex_groups[name].index
                           for name in mpfb_skin_groups(side, finger)
@@ -66,6 +68,8 @@ def inspect_handle_skin(rig, targets, body_meshes):
                         gap, axial = cylinder_gap(world_point, center, axis, radius)
                         if abs(axial) <= 0.10:
                             all_gaps.append(gap)
+                            if nearest_vertex is None or abs(gap) < nearest_vertex[0]:
+                                nearest_vertex = (abs(gap), world_point.copy(), gap)
                             if gap <= 0.055:
                                 gaps.append(gap)
                 finally:
@@ -91,10 +95,18 @@ def inspect_handle_skin(rig, targets, body_meshes):
                             gap, axial = cylinder_gap(point, center, axis, radius)
                             if abs(axial) <= 0.10:
                                 all_gaps.append(gap)
+                                if nearest_vertex is None or abs(gap) < nearest_vertex[0]:
+                                    nearest_vertex = (abs(gap), point.copy(), gap)
                                 if gap <= 0.055:
                                     gaps.append(gap)
                     finally:
                         evaluated.to_mesh_clear()
+            if nearest_vertex is not None:
+                radial = nearest_vertex[1] - center
+                radial -= axis * radial.dot(axis)
+                if radial.length > 1e-8:
+                    radial.normalize()
+                    hand_nearest[finger] = radial
             hand["fingers"][finger] = {
                 "selection_method": selection_method,
                 "sample_count": len(gaps),
@@ -108,6 +120,18 @@ def inspect_handle_skin(rig, targets, body_meshes):
                 "sampled_within_5mm": sum(abs(g) <= 0.005 for g in gaps),
                 "contact_verified": False,
             }
+        thumb_normal = hand_nearest.get("thumb")
+        index_normal = hand_nearest.get("index")
+        # A physical pinch requires opposing contact sides, not merely
+        # nearby fingertips. This is only an approximate sampled direction.
+        if thumb_normal is not None and index_normal is not None:
+            cosine = max(-1.0, min(1.0, thumb_normal.dot(index_normal)))
+            hand["thumb_index_radial_dot"] = round(float(cosine), 6)
+            hand["opposing_sides_proxy"] = cosine <= -0.35
+        else:
+            hand["thumb_index_radial_dot"] = None
+            hand["opposing_sides_proxy"] = False
+        hand["opposition_proxy_only"] = True
         hand["sample_count"] = sum(v["sample_count"] for v in hand["fingers"].values())
         hand["has_penetration_evidence"] = any(
             v["sampled_inside_over_2mm"] for v in hand["fingers"].values())
