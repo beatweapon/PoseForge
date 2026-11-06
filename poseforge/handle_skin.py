@@ -35,12 +35,17 @@ def inspect_handle_skin(rig, targets, body_meshes):
         hand = {"fingers": {}, "skipped_topology": []}
         for finger in FINGERS:
             gaps = []
+            all_gaps = []
+            weighted_count = 0
+            matched_groups = set()
             for obj in body_meshes:
                 groups = {obj.vertex_groups[name].index
                           for name in mpfb_skin_groups(side, finger)
                           if name in obj.vertex_groups}
                 if not groups:
                     continue
+                matched_groups.update(name for name in mpfb_skin_groups(side, finger)
+                                      if name in obj.vertex_groups)
                 evaluated = obj.evaluated_get(graph)
                 mesh = evaluated.to_mesh()
                 try:
@@ -52,14 +57,22 @@ def inspect_handle_skin(rig, targets, body_meshes):
                                   if any(g.group in groups and g.weight >= 0.2
                                          for g in v.groups))
                     for i in candidates:
+                        weighted_count += 1
                         world_point = evaluated.matrix_world @ mesh.vertices[i].co
                         gap, axial = cylinder_gap(world_point, center, axis, radius)
-                        if abs(axial) <= 0.10 and gap <= 0.055:
-                            gaps.append(gap)
+                        if abs(axial) <= 0.10:
+                            all_gaps.append(gap)
+                            if gap <= 0.055:
+                                gaps.append(gap)
                 finally:
                     evaluated.to_mesh_clear()
             hand["fingers"][finger] = {
                 "sample_count": len(gaps),
+                "weighted_vertex_count": weighted_count,
+                "axial_window_vertex_count": len(all_gaps),
+                "matched_vertex_groups": sorted(matched_groups),
+                "closest_signed_gap_in_axial_window_m": (
+                    min(all_gaps, key=abs) if all_gaps else None),
                 "nearest_abs_gap_m": min(map(abs, gaps), default=None),
                 "sampled_inside_over_2mm": sum(g < -0.002 for g in gaps),
                 "sampled_within_5mm": sum(abs(g) <= 0.005 for g in gaps),
