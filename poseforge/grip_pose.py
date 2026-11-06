@@ -24,8 +24,10 @@ def _axis_distance(point, origin, direction):
 
 
 def apply_cylinder_grip(rig, side, grip_world, axis_world=(1, 0, 0),
-                        radius=0.016):
-    """Try both finger-flexion signs; retain the better whole-hand template."""
+                        radius=0.016, curl_scale=1.0):
+    """Try both curl signs at a controlled scale, retain the better skeletal prior."""
+    if not 0.5 <= curl_scale <= 1.6:
+        raise ValueError("curl_scale outside experimental safe bounds")
     names = semantic_bones(rig.pose.bones.keys())
     fingers = ("thumb", "index", "middle", "ring", "pinky")
     bone_names = [names[f"{side}_{finger}_{i}"]
@@ -57,11 +59,11 @@ def apply_cylinder_grip(rig, side, grip_world, axis_world=(1, 0, 0),
             for joint, bend in enumerate(angles, 1):
                 pb = bones[names[f"{side}_{finger}_{joint}"]]
                 pb.rotation_mode = "XYZ"
-                pb.rotation_euler = (sign * bend, 0, 0)
+                pb.rotation_euler = (sign * bend * curl_scale, 0, 0)
         for joint, angles in enumerate(THUMB_BENDS, 1):
             pb = bones[names[f"{side}_thumb_{joint}"]]
             pb.rotation_mode = "XYZ"
-            pb.rotation_euler = tuple(sign * a for a in angles)
+            pb.rotation_euler = tuple(sign * a * curl_scale for a in angles)
         trial_points = tip_data()
         distances = scores(trial_points)
         # A finger should be close to the grip, but the axis is not the
@@ -78,15 +80,16 @@ def apply_cylinder_grip(rig, side, grip_world, axis_world=(1, 0, 0),
         for joint, bend in enumerate(angles, 1):
             pb = bones[names[f"{side}_{finger}_{joint}"]]
             pb.rotation_mode = "XYZ"
-            pb.rotation_euler = (chosen["sign"] * bend, 0, 0)
+            pb.rotation_euler = (chosen["sign"] * bend * curl_scale, 0, 0)
     for joint, angles in enumerate(THUMB_BENDS, 1):
         pb = bones[names[f"{side}_thumb_{joint}"]]
         pb.rotation_mode = "XYZ"
-        pb.rotation_euler = tuple(chosen["sign"] * a for a in angles)
+        pb.rotation_euler = tuple(chosen["sign"] * a * curl_scale for a in angles)
     final = tip_data()
     return {
         "name": "cylinder_finger_prior_v1",
         "selected_flexion_sign": chosen["sign"],
+        "curl_scale": curl_scale,
         "baseline_axis_distances_m": baseline_distances,
         "final_axis_distances_m": scores(final),
         "trials": options,
