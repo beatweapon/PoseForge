@@ -27,7 +27,10 @@ def summarize(report):
         return float(value) if value is not None else None
     return {
         "max_wrist_error_m": max(float(h["error_m"]) for h in hands),
-        "mean_palm_error_m": mean([float(h["joint_grip_fit"]["final"]["palm_error_m"])\n                                    if h.get("joint_grip_fit") else\n                                    hand_metric(h, "palm_anchor_fit", "final_error_m")\n                                    for h in hands]),
+        "mean_palm_error_m": mean([float(h["joint_grip_fit"]["final"]["palm_error_m"])
+                                    if h.get("joint_grip_fit") else
+                                    hand_metric(h, "palm_anchor_fit", "final_error_m")
+                                    for h in hands]),
         "mean_palm_plane_deg": mean([float(h["palm_frame_final"]["plane_deg"]) for h in hands]),
         "mean_index_axis_gap_m": (
             mean([float(h["finger_grip_prior"]["final_axis_distances_m"]["index"])
@@ -101,7 +104,8 @@ def main():
         "requires_visual_review": True,
         "views": list(VIEWS),
     }
-    (folder / "comparison.json").write_text(json.dumps(payload, indent=2) + "\n")
+    (folder / "comparison.json").write_text(json.dumps(payload, indent=2) + "
+")
     headings = ["# Bow grip batch comparison", "",
                 "All candidates were independently rendered from the same model and scene.",
                 "No automatic winner: human/vision inspection is required.", "",
@@ -124,8 +128,10 @@ def main():
                  "No natural-grip acceptance without visual and skin-contact evidence.",
                  "See comparison.png and each variant's report.json.",
                  "All contact and collision claims remain unverified.", ""]
-    (folder / "summary.md").write_text("\n".join(headings))
-    print("\n".join(headings))
+    (folder / "summary.md").write_text("
+".join(headings))
+    print("
+".join(headings))
 
 
 if __name__ == "__main__":
