@@ -52,7 +52,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
     The direction is interpreted as wrist->knuckles, in WORLD coordinates.
     """
     variant = os.environ.get("POSEFORGE_GRIP_VARIANT", "current")
-    experimental_scales = {"skin_loose": 0.70, "skin_firm": 1.20, "skin_tight": 1.50}
+    experimental_scales = {"skin_loose": 0.70, "skin_firm": 1.20, "skin_tight": 1.50, "skin_joint": 1.50}
     if variant not in ("current", "no_anchor", "no_roll", "no_finger_prior", *WEIGHTS, *experimental_scales):
         raise ValueError("Unknown POSEFORGE_GRIP_VARIANT: " + variant)
     bones = rig.pose.bones
@@ -209,9 +209,10 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
     # New experimental path: couple the palm-anchor error, orientation and
     # wrist deviation into one candidate score. Default behaviour is unchanged.
     joint_fits = {}
-    if variant in WEIGHTS:
+    if variant in WEIGHTS or variant == "skin_joint":
         for item in targets:
-            joint_fits[item["hand"]] = refine_joint_grip(rig, item, variant)
+            joint_fits[item["hand"]] = refine_joint_grip(
+                rig, item, "joint_position" if variant == "skin_joint" else variant)
 
     # Hand templates are applied AFTER arm positioning, against the shared
     # rigid handle frame. They do not move the prop or rewrite arm targets.
