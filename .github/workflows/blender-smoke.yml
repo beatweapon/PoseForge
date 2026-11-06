@@ -31,6 +31,9 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Validate Python syntax before Blender setup
+        run: python -m compileall -q poseforge ci tests
+
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
 
