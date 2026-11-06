@@ -95,6 +95,15 @@ def main():
             raise RuntimeError(f"{variant}: variant configuration was ignored")
         row = {"variant": variant, **summarize(report)}
         row["skin_quality"] = score_skin_samples(report.get("handle_skin_diagnostics"))
+        scales = {"current": 1.0, "skin_loose": 0.70,
+                  "skin_firm": 1.20, "skin_tight": 1.50}
+        actual_scales = {
+            h.get("finger_grip_prior", {}).get("curl_scale")
+            for h in report.get("targets", [])
+        }
+        if actual_scales != {scales[variant]}:
+            raise RuntimeError(f"{variant}: curl scale ignored: {actual_scales}")
+        row["curl_scale"] = scales[variant]
         if set((row["sampled_skin"] or {}).get("hands", {})) != {"left", "right"}:
             raise RuntimeError(f"{variant}: missing handle skin diagnostics")
         rows.append(row)
@@ -117,13 +126,13 @@ def main():
         "Four isolated curl strengths using an identical rigid prop and cameras.",
         "Sampled mesh proximity and penetration are diagnostics, not contact proof.",
         "",
-        "| Variant | Wrist max (mm) | Palm mean (mm) | Skin score ↓ | Close fingers / 4 | Deep inside vertices |",
-        "|---|---:|---:|---:|---:|---:|",
+        "| Variant | Curl scale | Wrist max (mm) | Palm mean (mm) | Skin score ↓ | Close fingers / 4 | Deep inside vertices |",
+        "|---|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         q = row["skin_quality"]
         headings.append(
-            f'| {row["variant"]} | {row["max_wrist_error_m"]*1000:.1f} | '
+            f'| {row["variant"]} | {row["curl_scale"]:.2f} | {row["max_wrist_error_m"]*1000:.1f} | '
             f'{row["mean_palm_error_m"]*1000:.1f} | {q["score"]:.1f} | '
             f'{q["near_surface_fingers"]}/4 | {q["penetrating_vertices"]} |'
         )
