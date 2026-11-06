@@ -12,6 +12,7 @@ from rig import arm_chain, wrist_bone_name, semantic_bones
 from grip_pose import apply_cylinder_grip
 from palm_anchor import resolve_palm_target, fit_palm_anchor, palm_anchor
 from joint_fit import refine_joint_grip, WEIGHTS
+from skin_feedback import refine_skin_wrist
 
 
 def _hand_frame(bones, names, side):
@@ -52,7 +53,8 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
     The direction is interpreted as wrist->knuckles, in WORLD coordinates.
     """
     variant = os.environ.get("POSEFORGE_GRIP_VARIANT", "current")
-    experimental_scales = {"skin_loose": 0.70, "skin_firm": 1.20, "skin_tight": 1.50, "skin_joint": 1.50}
+    experimental_scales = {"skin_loose": 0.70, "skin_firm": 1.20, "skin_tight": 1.50, "skin_joint": 1.50,
+                           "skin_feedback": 1.50}
     if variant not in ("current", "no_anchor", "no_roll", "no_finger_prior", *WEIGHTS, *experimental_scales):
         raise ValueError("Unknown POSEFORGE_GRIP_VARIANT: " + variant)
     bones = rig.pose.bones
@@ -209,10 +211,10 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
     # New experimental path: couple the palm-anchor error, orientation and
     # wrist deviation into one candidate score. Default behaviour is unchanged.
     joint_fits = {}
-    if variant in WEIGHTS or variant == "skin_joint":
+    if variant in WEIGHTS or variant in ("skin_joint", "skin_feedback"):
         for item in targets:
             joint_fits[item["hand"]] = refine_joint_grip(
-                rig, item, "joint_position" if variant == "skin_joint" else variant)
+                rig, item, "joint_position" if variant in ("skin_joint", "skin_feedback") else variant)
 
     # Hand templates are applied AFTER arm positioning, against the shared
     # rigid handle frame. They do not move the prop or rewrite arm targets.
@@ -224,6 +226,20 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             radius=item.get("handle_radius_m", 0.016),
             curl_scale=experimental_scales.get(variant, 1.0))
             if variant != "no_finger_prior" else None)
+
+    skin_feedback = {}
+    if variant == "skin_feedback":
+        body_meshes = [
+            obj for obj in bpy.data.objects if obj.type == "MESH"
+            and (obj.parent == rig or any(
+                modifier.type == "ARMATURE" and modifier.object == rig
+                for modifier in obj.modifiers))
+        ]
+        if not body_meshes:
+            raise RuntimeError("No skinned body mesh for skin feedback")
+        for item in targets:
+            skin_feedback[item["hand"]] = refine_skin_wrist(
+                rig, item, body_meshes)
 
     # Sample after BOTH arms are solved; no stale first-hand measurements.
     for row in results:
@@ -259,6 +275,7 @@ def solve_grip_frames(rig, targets, *, max_orientation_rad=0.20):
             "experiment_variant": variant,
             "palm_anchor_fit": palm_fits[side],
             "joint_grip_fit": joint_fits.get(side),
+            "skin_feedback": skin_feedback.get(side),
             "pose_quality": {
                 "status": "unverified",
                 "criteria": "palm plane <= 25deg; index tip axis gap <= 25mm",
