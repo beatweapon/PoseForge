@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 from grip_quality import score_skin_samples, compare_skin_candidates
 
 ROOT = Path(__file__).resolve().parent.parent
-VARIANTS = ("current", "skin_loose", "skin_tight", "skin_joint")
+VARIANTS = ("current", "skin_tight", "skin_joint", "skin_feedback")
 VIEWS = ("front", "back", "three_quarter", "hand_closeup")
 
 
@@ -95,8 +95,8 @@ def main():
             raise RuntimeError(f"{variant}: variant configuration was ignored")
         row = {"variant": variant, **summarize(report)}
         row["skin_quality"] = score_skin_samples(report.get("handle_skin_diagnostics"))
-        scales = {"current": 1.0, "skin_loose": 0.70,
-                  "skin_tight": 1.50, "skin_joint": 1.50}
+        scales = {"current": 1.0, "skin_tight": 1.50,
+                  "skin_joint": 1.50, "skin_feedback": 1.50}
         actual_scales = {
             h.get("finger_grip_prior", {}).get("curl_scale")
             for h in report.get("targets", [])
@@ -104,7 +104,16 @@ def main():
         if actual_scales != {scales[variant]}:
             raise RuntimeError(f"{variant}: curl scale ignored: {actual_scales}")
         row["curl_scale"] = scales[variant]
-        if variant == "skin_joint":
+        if variant == "skin_feedback":
+            feedback = [h.get("skin_feedback") for h in report.get("targets", [])]
+            if len(feedback) != 2 or any(
+                    not f or len(f["trials"]) != 5
+                    or not f["improved_or_unchanged"]
+                    or not f["deep_penetration_not_increased"]
+                    for f in feedback):
+                raise RuntimeError("Skin-feedback constraints or reports missing")
+            row["skin_feedback"] = feedback
+        if variant in ("skin_joint", "skin_feedback"):
             fits = row["joint_fits"]
             if len(fits) != 2 or any(
                 fit is None or not fit["objective_non_regression"]
@@ -118,7 +127,7 @@ def main():
     if not (folder / "comparison.png").is_file():
         raise RuntimeError("Montage generation failed")
     payload = {
-        "experiment": "bow skin/arm combined candidate comparison v4",
+        "experiment": "bow actual skin guided wrist refinement v5",
         "reference": "current",
         "variants": rows,
         "selected": None,
