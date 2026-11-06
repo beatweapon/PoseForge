@@ -11,7 +11,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
-VARIANTS = ("current", "joint_balanced", "joint_contact", "joint_orientation")
+VARIANTS = ("current", "joint_balanced", "joint_position", "joint_orientation")
 VIEWS = ("front", "back", "three_quarter", "hand_closeup")
 
 
@@ -28,7 +28,7 @@ def summarize(report):
     return {
         "max_wrist_error_m": max(float(h["error_m"]) for h in hands),
         "mean_palm_error_m": mean([hand_metric(h, "palm_anchor_fit", "final_error_m") for h in hands]),
-        "mean_palm_plane_deg": mean([float(h["palm_frame_after"]["plane_deg"]) for h in hands]),
+        "mean_palm_plane_deg": mean([float(h["palm_frame_final"]["plane_deg"]) for h in hands]),
         "mean_index_axis_gap_m": (
             mean([float(h["finger_grip_prior"]["final_axis_distances_m"]["index"])
                   for h in hands]) if all(h.get("finger_grip_prior") for h in hands) else None),
@@ -113,6 +113,9 @@ def main():
             if len(fits) != 2 or any(not fit["objective_non_regression"]
                                       or len(fit["trials"]) != 13 for fit in fits):
                 raise RuntimeError("Incomplete or regressing coupled search")
+            if r["variant"] == "joint_position" and not all(
+                    fit["arm_position_refinement"]["attempted"] for fit in fits):
+                raise RuntimeError("Joint position refinement was not attempted")
         gap = "n/a" if r["mean_index_axis_gap_m"] is None else f'{r["mean_index_axis_gap_m"]*1000:.1f}'
         headings.append(f'| {r["variant"]} | {r["max_wrist_error_m"]*1000:.1f} | '
                         f'{r["mean_palm_error_m"]*1000:.1f} | '

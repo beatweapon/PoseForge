@@ -157,3 +157,13 @@ Comparison artifacts are emitted automatically. None of these metrics
 establishes skin contact, collision freedom, or anatomical joint-limit
 compliance. The current solution remains the production default unless a
 visual review justifies a change.
+
+
+### Batch second iteration
+
+After visually finding almost identical results from the first three weightings,
+the second batch replaces the `joint_contact` weighting-only variant with
+`joint_position`: it adds a limited *arm-position correction after wrist
+orientation* and rolls back if the coupled objective or wrist budget worsens.
+The summary now uses `palm_frame_final`, not the intermediate palm plane
+captured before the last pose operation. No grip is automatically promoted.

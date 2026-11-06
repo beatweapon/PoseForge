@@ -15,7 +15,7 @@ from rig import semantic_bones, wrist_bone_name
 
 WEIGHTS = {
     "joint_balanced": (1.0, 0.45, 0.16),
-    "joint_contact": (2.0, 0.20, 0.10),
+    "joint_position": (1.5, 0.30, 0.20),
     "joint_orientation": (0.6, 1.0, 0.18),
 }
 
@@ -106,6 +106,33 @@ def refine_joint_grip(rig, item, variant, *, wrist_budget_m=0.025):
 
     wrist.matrix = best
     final = measure()
+    position_refinement = {"attempted": False, "accepted": False}
+    if variant == "joint_position":
+        # One small arm-space adjustment after finding hand orientation.
+        # This tests a genuinely different hypothesis from wrist-only
+        # orientation trials, while preserving the best whole-arm pose.
+        from palm_anchor import fit_palm_anchor
+        from rig import arm_chain
+        chain = arm_chain(side, bones.keys())
+        saved_names = list(dict.fromkeys(chain + [wrist.name]))
+        saved = {name: bones[name].matrix.copy() for name in saved_names}
+        candidate_fit = fit_palm_anchor(
+            rig, side, target, passes=3,
+            wrist_goal_world=wrist_goal, wrist_max_deviation=wrist_budget_m)
+        after = measure()
+        position_refinement = {"attempted": True,
+                               "candidate_fit": candidate_fit,
+                               "candidate_score": after["objective"]}
+        if (after["wrist_error_m"] <= wrist_budget_m and
+                after["objective"] + 0.00001 < final["objective"]):
+            final = after
+            position_refinement["accepted"] = True
+        else:
+            for name in sorted(saved_names,
+                               key=lambda name: len(bones[name].parent_recursive)):
+                bones[name].matrix = saved[name]
+                bpy.context.view_layer.update()
+            final = measure()
     return {
         "name": "coupled_grip_proxy_v1",
         "variant": variant,
@@ -113,6 +140,7 @@ def refine_joint_grip(rig, item, variant, *, wrist_budget_m=0.025):
         "final": final,
         "trials": trials,
         "wrist_budget_m": wrist_budget_m,
+        "arm_position_refinement": position_refinement,
         "objective_non_regression": (
             final["objective"] <= baseline["objective"] + 0.0001),
         "measured_palm_is_skeletal_proxy": True,
