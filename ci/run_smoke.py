@@ -140,6 +140,15 @@ def main():
                 "- bow hold: wrist-to-target errors=" + str(errors)
                 + "; rigid bow length=" + str(prop.get("length_m")))
         if scene_name in ("bow_hold", "staff_hold") and report:
+            skin = (report.get("handle_skin_diagnostics") or {}).get("hands", {})
+            if set(skin) != {"left", "right"}:
+                problems.append("missing evaluated handle skin diagnostics")
+            else:
+                for side in ("left", "right"):
+                    entry = skin[side]
+                    geometry_notes.append(
+                        f"- {scene_name}/{side}: skin samples={entry['sample_count']}, "
+                        f"penetration evidence={entry['has_penetration_evidence']}")
             wrists = report.get("targets", [])
             if len(wrists) != 2:
                 problems.append("two wrist grips required")
