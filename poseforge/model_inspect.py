@@ -3,7 +3,10 @@ import json
 import sys
 from pathlib import Path
 
-import bpy\nfrom rig import classify_bones
+import bpy
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from rig import classify_bones
 
 
 def main():
